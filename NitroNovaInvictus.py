@@ -43,19 +43,16 @@ def clickable_label(typeOfFrame, textOfLabel, Xaxis, Yaxis, sizeOfWidget):
 
 ### Functions that allow me to create different widgets + clickable labels ###
 
-def change_frame(target):
-    LoginFrame.place_forget()
-    if target == "Forgot Password?":
+def change_frame(current, target):
+    current.place_forget()
+    if target == ForgotPasswordFrame:
         ForgotPasswordFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
-    elif target == "Create Account":
+    elif target == CreateAccountFrame:
         CreateAccountFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
+    elif target == LoginFrame:
+        LoginFrame.place(x=0, y=0, relwidth=1, relheight=1)
 
-### Function that enables frames to be swaped ###
-
-def GoBackToLogInFrame(currentFrame):
-    if currentFrame == "CreateAccountFrame":
-        CreateAccountFrame.place_forget()
-    LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
+### Function that enables frames to be swaped, needs 2 parameters: One for the current frame, and the other for the frame you want to switch to ###
 
 LogInLabel = construct(LoginFrame, "Label", "Log In", 275, 50, 50)
 UsernameLabel = construct(LoginFrame, "Label", "Username", 120, 175, 25)
@@ -66,12 +63,13 @@ LogInButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
 LogInButton.configure(width = 15)
 
 ForgotPasswordLabel = clickable_label(LoginFrame, "Forgot Password?",  270, 550, 20)
-ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame("Forgot Password?"))
+ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, ForgotPasswordFrame))
 CreateAccountLabel = clickable_label(LoginFrame, "Create account", 270, 585, 20)
-CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame("Create Account"))
+CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, CreateAccountFrame))
 
 ### All login features and widgets being created ###
-table = [
+
+LabelTable = [
     ("First Name", 50, 150),
     ("Last Name", 50, 230),
     ("Email Address", 50, 310),
@@ -83,16 +81,21 @@ table = [
     ("Security Question 2", 400, 390),
     ("Correct Answer 2", 400, 470),
 ]
+            ### Create a table with all the features I want to implement on the 'Create Account'
+            ### Page, so I can loop and place them on the Frame
 
-entries = {}
+EntryTable = {}
 
-for labelText, Xaxis, Yaxis in table:
+for labelText, Xaxis, Yaxis in LabelTable:
     construct(CreateAccountFrame, "Label", labelText, Xaxis, Yaxis, 20)
-    entries[labelText] = construct(CreateAccountFrame, "Entry", labelText, Xaxis, Yaxis+ 40, 20)
+    EntryTable[labelText] = construct(CreateAccountFrame, "Entry", labelText, Xaxis, Yaxis+ 40, 20)
+
+            ### entries stores all the Entry widgets after the for loop iterates through my LabelTable
+            ### table and places them on the frame
 
 CreateAccountLabelPage = construct(CreateAccountFrame, "Label", "Create Account", 50, 20, 50)
 NextButton = construct(CreateAccountFrame, "Button", ">>", 500, 600, 25)
-NextButton.configure(width = 14, command = lambda: GoBackToLogInFrame("CreateAccountFrame"))
+NextButton.configure(width = 14, command = lambda: change_frame(CreateAccountFrame, LoginFrame))
 
 ### Created the "Create Account" Frame" ###
 
