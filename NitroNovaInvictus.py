@@ -62,8 +62,8 @@ UsernameLabel = construct(LoginFrame, "Label", "Username", 120, 175, 25)
 UsernameEntry = construct(LoginFrame, "Entry", "Username", 125, 225, 25)
 PasswordLabel = construct(LoginFrame, "Label", "Password", 120, 275, 25)
 PasswordEntry = construct(LoginFrame, "Entry", "Password", 125, 325, 25)
-SubmitButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
-SubmitButton.configure(width = 15)
+LogInButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
+LogInButton.configure(width = 15)
 
 ForgotPasswordLabel = clickable_label(LoginFrame, "Forgot Password?",  270, 550, 20)
 ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame("Forgot Password?"))
@@ -71,18 +71,26 @@ CreateAccountLabel = clickable_label(LoginFrame, "Create account", 270, 585, 20)
 CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame("Create Account"))
 
 ### All login features and widgets being created ###
+table = [
+    ("First Name", 50, 150),
+    ("Last Name", 50, 230),
+    ("Email Address", 50, 310),
+    ("Password", 50, 390),
+    ("Confirm Password", 50, 470),
+    ("Username", 400, 150),
+    ("Security Question 1", 400, 230),
+    ("Correct Answer 1", 400, 310),
+    ("Security Question 2", 400, 390),
+    ("Correct Answer 2", 400, 470),
+]
+
+entries = {}
+
+for labelText, Xaxis, Yaxis in table:
+    construct(CreateAccountFrame, "Label", labelText, Xaxis, Yaxis, 20)
+    entries[labelText] = construct(CreateAccountFrame, "Entry", labelText, Xaxis, Yaxis+ 40, 20)
 
 CreateAccountLabelPage = construct(CreateAccountFrame, "Label", "Create Account", 50, 20, 50)
-FirstNameLabel = construct(CreateAccountFrame, "Label", "First Name", 50 , 150, 20)
-FirstNameEntry = construct(CreateAccountFrame, "Entry", "First Name", 50, 190, 20)
-LastNameLabel = construct(CreateAccountFrame, "Label", "Last Name", 50, 230, 20)
-LastNameEntry = construct(CreateAccountFrame, "Entry", "Last Name", 50, 270, 20)
-EmailAddressLabel = construct(CreateAccountFrame, "Label", "Email Address", 50, 310, 20)
-EmailAddressEntry = construct(CreateAccountFrame, "Entry", "Email Address", 50, 350, 20)
-PasswordLabel = construct(CreateAccountFrame, "Label", "Password", 50, 390, 20)
-PasswordEntry = construct(CreateAccountFrame, "Entry", "Password", 50, 430, 20)
-ConfirmPasswordLabel = construct(CreateAccountFrame, "Label", "Confirm Password", 50, 470, 20)
-ConfirmPasswordEntry = construct(CreateAccountFrame, "Entry", "Confirm Password", 50, 510, 20)
 NextButton = construct(CreateAccountFrame, "Button", ">>", 500, 600, 25)
 NextButton.configure(width = 14, command = lambda: GoBackToLogInFrame("CreateAccountFrame"))
 
