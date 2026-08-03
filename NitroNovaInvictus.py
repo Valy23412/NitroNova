@@ -7,12 +7,14 @@ Window.title("NitroNova")
 LoginFrame = tk.Frame(Window, bg="#0A0A2A")
 LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
 
-ForgotPasswordFrame = tk.Frame(Window, bg="#0A0A2A")
+ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
+ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
 CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
+HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
 
 ### Creating Frames and the main Window ###
 
-def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget):
+def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable = False):
     if typeOfWidget == "Label":
         widget = tk.Label(typeOfFrame,
                           text=textOfLabel,
@@ -21,7 +23,6 @@ def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
 
     elif typeOfWidget == "Entry":
         widget = tk.Entry(typeOfFrame,
-                          text=textOfLabel,
                           font=("Agency FB", sizeOfWidget, "bold"),
                           bg="#A9A9A9")
 
@@ -31,26 +32,18 @@ def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
                            font=("Agency FB", sizeOfWidget, "bold"),
                            bg="#40E0D0")
 
+    if clickable and typeOfWidget == "Label":
+        widget.configure(cursor="hand2")
+        widget.bind("<Button-1>")
+
     widget.place(x=Xaxis, y=Yaxis)
     return widget
 
-
-def clickable_label(typeOfFrame, textOfLabel, Xaxis, Yaxis, sizeOfWidget):
-    LabelClick = construct(typeOfFrame, "Label", textOfLabel, Xaxis, Yaxis, sizeOfWidget)
-    LabelClick.configure(cursor = "hand2")
-    LabelClick.bind("<Button-1>")
-    return LabelClick
-
-### Functions that allow me to create different widgets + clickable labels ###
+### Function that allow me to create different widgets + clickable labels ###
 
 def change_frame(current, target):
     current.place_forget()
-    if target == ForgotPasswordFrame:
-        ForgotPasswordFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
-    elif target == CreateAccountFrame:
-        CreateAccountFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
-    elif target == LoginFrame:
-        LoginFrame.place(x=0, y=0, relwidth=1, relheight=1)
+    target.place(x= 0, y= 0, relwidth= 1, relheight= 1)
 
 ### Function that enables frames to be swaped, needs 2 parameters: One for the current frame, and the other for the frame you want to switch to ###
 
@@ -60,11 +53,11 @@ UsernameEntry = construct(LoginFrame, "Entry", "Username", 125, 225, 25)
 PasswordLabel = construct(LoginFrame, "Label", "Password", 120, 275, 25)
 PasswordEntry = construct(LoginFrame, "Entry", "Password", 125, 325, 25)
 LogInButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
-LogInButton.configure(width = 15)
+LogInButton.configure(width = 14, command = lambda: change_frame(LoginFrame, HomePageFrame))
 
-ForgotPasswordLabel = clickable_label(LoginFrame, "Forgot Password?",  270, 550, 20)
-ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, ForgotPasswordFrame))
-CreateAccountLabel = clickable_label(LoginFrame, "Create account", 270, 585, 20)
+ForgotPasswordLabel = construct(LoginFrame,"Label",  "Forgot Password?",  270, 550, 20, clickable = True)
+ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, ForgotPasswordFrame1))
+CreateAccountLabel = construct(LoginFrame, "Label", "Create account", 270, 585, 20, clickable = True)
 CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, CreateAccountFrame))
 
 ### All login features and widgets being created ###
@@ -98,5 +91,25 @@ NextButton = construct(CreateAccountFrame, "Button", ">>", 500, 600, 25)
 NextButton.configure(width = 14, command = lambda: change_frame(CreateAccountFrame, LoginFrame))
 
 ### Created the "Create Account" Frame" ###
+
+ForgotPasswordTitle = construct(ForgotPasswordFrame1, "Label", "Forgot Password", 50, 20, 50)
+EmailAddressLabel = construct(ForgotPasswordFrame1, "Label", "Email Address", 50, 150, 30)
+EmailAddressEntry = construct(ForgotPasswordFrame1, "Entry", "Email Address", 50, 210, 30)
+ConfirmEmailAddressLabel = construct(ForgotPasswordFrame1, "Label", "Confirm Email Address", 50, 270, 30)
+ConfirmEmailAddressEntry = construct(ForgotPasswordFrame1, "Entry", "Confirm Email Address", 50, 330, 30)
+
+EmailAddressButton = construct(ForgotPasswordFrame1, "Button", ">>", 500, 600, 25)
+EmailAddressButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2))
+
+### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
+
+SecurityQuestionsButton = construct(ForgotPasswordFrame2, "Button", ">>", 500, 600, 25)
+SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, LoginFrame))
+
+### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
+### It will be created after my database is created, so I can extract the information
+### The user is then redirected to the Log-In page so they can use their credentials to enter NitroNova
+
+HomePageLabel = construct(HomePageFrame, "Label", "Home Page", 50, 20, 50)
 
 Window.mainloop()
