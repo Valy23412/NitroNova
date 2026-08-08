@@ -1,4 +1,5 @@
 import tkinter as tk
+import sqlite3
 
 Window = tk.Tk()
 Window.geometry("700x700")
@@ -112,4 +113,23 @@ SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(For
 
 HomePageLabel = construct(HomePageFrame, "Label", "Home Page", 50, 20, 50)
 
+### Created "Home Page" Frame ###
+connection = sqlite3.connect(r"C:\Users\valen\Desktop\NitroNova.db")
+connection.execute("""CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    security_question_1 TEXT,
+    security_answer_1 TEXT,
+    security_question_2 TEXT,
+    security_answer_2 TEXT
+);""")
+
+connection.commit()
+connection.close()
+
+### Created database ###Users/valen/Pychram
 Window.mainloop()
