@@ -15,11 +15,12 @@ HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
 
 ### Creating Frames and the main Window ###
 
-def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable = False):
+def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
     if typeOfWidget == "Label":
         widget = tk.Label(typeOfFrame,
                           text=textOfLabel,
                           font=("Agency FB", sizeOfWidget, "bold"),
+                          fg="#E8FFF0",
                           bg="#0A0A2A")
 
     elif typeOfWidget == "Entry":
@@ -35,7 +36,6 @@ def construct(typeOfFrame ,typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
 
     if clickable and typeOfWidget == "Label":
         widget.configure(cursor="hand2")
-        widget.bind("<Button-1>")
 
     widget.place(x=Xaxis, y=Yaxis)
     return widget
@@ -56,9 +56,9 @@ PasswordEntry = construct(LoginFrame, "Entry", "Password", 125, 325, 25)
 LogInButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
 LogInButton.configure(width = 14, command = lambda: change_frame(LoginFrame, HomePageFrame))
 
-ForgotPasswordLabel = construct(LoginFrame,"Label",  "Forgot Password?",  270, 550, 20, clickable = True)
+ForgotPasswordLabel = construct(LoginFrame, "Label", "Forgot Password?", 270, 550, 20, clickable=True)
 ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, ForgotPasswordFrame1))
-CreateAccountLabel = construct(LoginFrame, "Label", "Create account", 270, 585, 20, clickable = True)
+CreateAccountLabel = construct(LoginFrame, "Label", "Create account", 270, 585, 20, clickable=True)
 CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, CreateAccountFrame))
 
 ### All login features and widgets being created ###
@@ -76,7 +76,7 @@ LabelTable = [
     ("Correct Answer 2", 400, 470),
 ]
             ### Create a table with all the features I want to implement on the 'Create Account'
-            ### Page, so I can loop and place them on the Frame
+            ### page, so I can loop and place them on the Frame
 
 EntryTable = {}
 
@@ -84,13 +84,12 @@ for labelText, Xaxis, Yaxis in LabelTable:
     construct(CreateAccountFrame, "Label", labelText, Xaxis, Yaxis, 20)
     EntryTable[labelText] = construct(CreateAccountFrame, "Entry", labelText, Xaxis, Yaxis+ 40, 20)
 
-            ### entries stores all the Entry widgets after the for loop iterates through my LabelTable
+            ### Entries stores all the Entry widgets after the for loop iterates through my LabelTable
             ### table and places them on the frame
 
 CreateAccountLabelPage = construct(CreateAccountFrame, "Label", "Create Account", 50, 20, 50)
-NextButton = construct(CreateAccountFrame, "Button", ">>", 500, 600, 25)
+NextButton = construct(CreateAccountFrame, "Button", ">>", 400, 600, 25)
 NextButton.configure(width = 14, command = lambda: change_frame(CreateAccountFrame, LoginFrame))
-
 ### Created the "Create Account" Frame" ###
 
 ForgotPasswordTitle = construct(ForgotPasswordFrame1, "Label", "Forgot Password", 50, 20, 50)
@@ -99,14 +98,18 @@ EmailAddressEntry = construct(ForgotPasswordFrame1, "Entry", "Email Address", 50
 ConfirmEmailAddressLabel = construct(ForgotPasswordFrame1, "Label", "Confirm Email Address", 50, 270, 30)
 ConfirmEmailAddressEntry = construct(ForgotPasswordFrame1, "Entry", "Confirm Email Address", 50, 330, 30)
 
-EmailAddressButton = construct(ForgotPasswordFrame1, "Button", ">>", 500, 600, 25)
-EmailAddressButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2))
+EmailAddressPageButton = construct(ForgotPasswordFrame1, "Button", ">>", 500, 600, 25)
+EmailAddressPageButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2))
 
+BackToLogInButton = construct(ForgotPasswordFrame1, "Button", "<<", 300, 600, 25)
+BackToLogInButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, LoginFrame))
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
 SecurityQuestionsButton = construct(ForgotPasswordFrame2, "Button", ">>", 500, 600, 25)
 SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, LoginFrame))
 
+BackToForgotPasswordButton = construct(ForgotPasswordFrame2, "Button", "<<", 300, 600, 25)
+BackToForgotPasswordButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, ForgotPasswordFrame1))
 ### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
 ### It will be created after my database is created, so I can extract the information
 ### The user is then redirected to the Log-In page so they can use their credentials to enter NitroNova
@@ -131,5 +134,5 @@ connection.execute("""CREATE TABLE IF NOT EXISTS users (
 connection.commit()
 connection.close()
 
-### Created database ###Users/valen/Pychram
+### Created database ###
 Window.mainloop()
