@@ -1,5 +1,6 @@
 import tkinter as tk
 import sqlite3
+import hashlib
 
 Window = tk.Tk()
 Window.geometry("700x700")
@@ -12,6 +13,49 @@ ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
 CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
 HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
+
+def create_account():
+    FirstName = EntryTable["First Name"].get().strip()
+    LastName = EntryTable["Last Name"].get().strip()
+    Email = EntryTable["Email Address"].get().strip()
+    Password = EntryTable["Password"].get()
+    ConfirmPassword = EntryTable["Confirm Password"].get()
+    Username = EntryTable["Username"].get().strip()
+    SecurityQuestion1 = EntryTable["Security Question 1"].get().strip()
+    SecurityAnswer1 = EntryTable["Correct Answer 1"].get().strip()
+    SecurityQuestion2 = EntryTable["Security Question 2"].get().strip()
+    SecurityAnswer2 = EntryTable["Correct Answer 2"].get().strip()
+
+    if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == ""
+        or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
+        print("Please fill in all fields")
+        return
+
+    if Password != ConfirmPassword:
+        print("Passwords do not match")
+        return
+
+    PasswordBytes = Password.encode()  #Turn the password into bytes
+    Scrambled = hashlib.sha256(PasswordBytes)  #Blend
+    PasswordHash = Scrambled.hexdigest()  #Blend into text to store
+
+    connection = sqlite3.connect(r"C:\Users\valen\Desktop\NitroNova.db")
+    C:\Users\valen\PycharmProjects\NitroNova\NitroNovaInvictus.py
+    try:
+        connection.execute("""INSERT INTO users
+                                  (first_name, last_name, username, email, password_hash, security_question_1, security_answer_1, security_question_2, security_answer_2)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (FirstName, LastName, Username, Email, PasswordHash, SecurityQuestion1, SecurityAnswer1, SecurityQuestion2, SecurityAnswer2))
+        connection.commit()
+
+    except sqlite3.IntegrityError:
+        print("Username or email already taken")
+        connection.close()
+        return
+
+    connection.close()
+
+    change_frame(CreateAccountFrame, LoginFrame)
 
 ### Creating Frames and the main Window ###
 
@@ -89,7 +133,8 @@ for labelText, Xaxis, Yaxis in LabelTable:
 
 CreateAccountLabelPage = construct(CreateAccountFrame, "Label", "Create Account", 50, 20, 50)
 NextButton = construct(CreateAccountFrame, "Button", ">>", 400, 600, 25)
-NextButton.configure(width = 14, command = lambda: change_frame(CreateAccountFrame, LoginFrame))
+NextButton.configure(width = 14, command = create_account)
+
 ### Created the "Create Account" Frame" ###
 
 ForgotPasswordTitle = construct(ForgotPasswordFrame1, "Label", "Forgot Password", 50, 20, 50)
@@ -103,6 +148,7 @@ EmailAddressPageButton.configure(width = 14, command = lambda: change_frame(Forg
 
 BackToLogInButton = construct(ForgotPasswordFrame1, "Button", "<<", 300, 600, 25)
 BackToLogInButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, LoginFrame))
+
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
 SecurityQuestionsButton = construct(ForgotPasswordFrame2, "Button", ">>", 500, 600, 25)
@@ -110,13 +156,17 @@ SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(For
 
 BackToForgotPasswordButton = construct(ForgotPasswordFrame2, "Button", "<<", 300, 600, 25)
 BackToForgotPasswordButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, ForgotPasswordFrame1))
+
 ### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
 ### It will be created after my database is created, so I can extract the information
 ### The user is then redirected to the Log-In page so they can use their credentials to enter NitroNova
 
 HomePageLabel = construct(HomePageFrame, "Label", "Home Page", 50, 20, 50)
+BackFromHomePageButton = construct(HomePageFrame, "Button", "<<", 500, 600, 25)
+BackFromHomePageButton.configure(width = 14, command = lambda: change_frame(HomePageFrame, LoginFrame))
 
 ### Created "Home Page" Frame ###
+
 connection = sqlite3.connect(r"C:\Users\valen\Desktop\NitroNova.db")
 connection.execute("""CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
