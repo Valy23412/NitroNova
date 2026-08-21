@@ -2,6 +2,8 @@ import tkinter as tk
 import sqlite3
 import hashlib
 
+
+
 class Database:
     def __init__(self, path):
         self.Path = path
@@ -56,7 +58,13 @@ class Database:
         connection.close()
         return Saved
 
+### Database class which contains different methods ###
+
+
+
 def create_account():
+    ErrorLabel.configure(text="") ### Ensures no previous error message is being shown ###
+
     FirstName = EntryTable["First Name"].get().strip()
     LastName = EntryTable["Last Name"].get().strip()
     Email = EntryTable["Email Address"].get().strip()
@@ -70,37 +78,101 @@ def create_account():
 
     ### Storing all the information we get from the user ###
 
-    if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == ""
-        or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
-        print("Please fill in all fields")
+    if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == "" or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
+        ErrorLabel.configure(text="Ensure no fields are left blank")
         return
-        ### Making sure no fields are blank ###
+    ### Making sure no fields are blank ###
+
+    if Email.count("@") != 1:
+        ErrorLabel.configure(text="Email must contain exactly one @")
+        return
+
+    if Email.startswith("@"):
+        ErrorLabel.configure(text="Email must start with a name")
+        return
+
+    AtPosition = Email.find("@")
+    DotPosition = Email.find(".", AtPosition + 1)
+
+    if DotPosition == -1:
+        ErrorLabel.configure(text="Email must contain a dot after the @")
+        return
+    ### Ensures email syntax is correct ###
+
+    DomainPart = Email[AtPosition + 1:].lower()
+
+    if DomainPart.startswith("gmail") == False and DomainPart.startswith("yahoo") == False:
+        ErrorLabel.configure(text="Email must use gmail or yahoo")
+        return
+
+    if DomainPart.endswith(".com") == False and DomainPart.endswith(".uk") == False:
+        ErrorLabel.configure(text="Email must end with .com or .uk")
+        return
+    ### Checks for gmail or yahoo, ending in .com or .uk ###
 
     if Password != ConfirmPassword:
-        print("Passwords do not match")
+        ErrorLabel.configure(text= "Passwords do not match")
         return
-        ### Checking if the passwords match ###
+    ### Checking if the passwords match ###
+
+    if len(Password) < 8:
+        ErrorLabel.configure(text="Password must be at least 8 characters")
+        return
+
+    UppercaseFound = False
+    LowercaseFound = False
+    NumberFound = False
+
+    ### Look through every character in the password ###
+    for Character in Password:
+        if Character.isupper():
+            UppercaseFound = True
+        if Character.islower():
+            LowercaseFound = True
+        if Character.isdigit():
+            NumberFound = True
+
+    if UppercaseFound == False:
+        ErrorLabel.configure(text="Password needs at least one capital letter")
+        return
+
+    if LowercaseFound == False:
+        ErrorLabel.configure(text="Password needs at least one lowercase letter")
+        return
+
+    if NumberFound == False:
+        ErrorLabel.configure(text="Password needs at least one number")
+        return
+
 
     PasswordBytes = Password.encode()  #Turn the password into bytes
     Scrambled = hashlib.sha256(PasswordBytes)  #Blend
     PasswordHash = Scrambled.hexdigest()  #Blend into text to store
 
     ### Save to the database using the Database class ###
-    if not DB.insert_user(FirstName, LastName, Username, Email, PasswordHash,
-                          SecurityQuestion1, SecurityAnswer1, SecurityQuestion2, SecurityAnswer2):
-        print("Username or email already taken")
+    Saved = DB.insert_user(FirstName, LastName, Username, Email, PasswordHash,
+                           SecurityQuestion1, SecurityAnswer1, SecurityQuestion2, SecurityAnswer2)
+
+    if Saved == False:
+        ErrorLabel.configure(text="Username or email already taken")
         return
 
     ### Only navigate on success ###
     change_frame(CreateAccountFrame, LoginFrame)
 
+### function which validates the information given, then stores it in the database ###
+
+
+
 def login():
+    LoginErrorLabel.configure(text="") ### Ensures no previous error message is being shown ###
+
     Username = UsernameEntry.get().strip()
     Password = PasswordEntry.get()
 
     ### Check if the fields are empty ###
     if Username == "" or Password == "":
-        print("Please fill in all fields")
+        LoginErrorLabel.configure(text="Please fill in all fields")
         return
 
     ### Hash the typed password (same blender as registration) ###
@@ -111,20 +183,23 @@ def login():
     ### Does the username exist? ###
     Row = DB.get_password_hash(Username)
     if Row is None:
-        print("Username not found")
+        LoginErrorLabel.configure(text="Username not found")
         return
 
     ### Does the hash match? ###
     if Row[0] != PasswordHash:
-        print("Incorrect password")
+        LoginErrorLabel.configure(text="Incorrect password")
         return
 
     ### Access granted that allows the user to reach Home ###
     change_frame(LoginFrame, HomePageFrame)
 
-### One Database object shared by the whole app ###
+### Function that deals with the Log In authentication ###
+
+
+
 DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
-DB.create_table()
+DB.create_table() ### One Database object shared by the whole app ###
 
 Window = tk.Tk()
 Window.geometry("700x700")
@@ -137,6 +212,9 @@ ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
 CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
 HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
+
+### Window configuration and frames are established ###
+
 
 def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
     if typeOfWidget == "Label":
@@ -165,17 +243,22 @@ def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
 
 ### Function that allow me to create different widgets + clickable labels ###
 
+
+
 def change_frame(current, target):
     current.place_forget()
     target.place(x= 0, y= 0, relwidth= 1, relheight= 1)
 
 ### Function that enables frames to be swaped, needs 2 parameters: One for the current frame, and the other for the frame you want to switch to ###
 
+
+
 LogInLabel = construct(LoginFrame, "Label", "Log In", 275, 50, 50)
 UsernameLabel = construct(LoginFrame, "Label", "Username", 120, 175, 25)
 UsernameEntry = construct(LoginFrame, "Entry", "Username", 125, 225, 25)
 PasswordLabel = construct(LoginFrame, "Label", "Password", 120, 275, 25)
 PasswordEntry = construct(LoginFrame, "Entry", "Password", 125, 325, 25)
+PasswordEntry.configure(show = "•")
 LogInButton = construct(LoginFrame, "Button", "Log In", 245, 475, 25)
 LogInButton.configure(width = 14, command = login)
 
@@ -184,22 +267,21 @@ ForgotPasswordLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, Fo
 CreateAccountLabel = construct(LoginFrame, "Label", "Create account", 270, 585, 20, clickable=True)
 CreateAccountLabel.bind("<Button-1>", lambda frame: change_frame(LoginFrame, CreateAccountFrame))
 
-### All login features and widgets being created ###
+LoginErrorLabel = construct(LoginFrame, "Label", "", 120, 370, 18)
+LoginErrorLabel.configure(fg = "#FF5555")
+
+### All Log In page features and widgets being created ###
+
+
 
 LabelTable = [
-    ("First Name", 50, 150),
-    ("Last Name", 50, 230),
-    ("Email Address", 50, 310),
-    ("Password", 50, 390),
-    ("Confirm Password", 50, 470),
-    ("Username", 400, 150),
-    ("Security Question 1", 400, 230),
-    ("Correct Answer 1", 400, 310),
-    ("Security Question 2", 400, 390),
-    ("Correct Answer 2", 400, 470),
-]
+    ("First Name", 50, 150), ("Last Name", 50, 230), ("Email Address", 50, 310),
+    ("Password", 50, 390), ("Confirm Password", 50, 470), ("Username", 400, 150),
+    ("Security Question 1", 400, 230), ("Correct Answer 1", 400, 310),
+    ("Security Question 2", 400, 390), ("Correct Answer 2", 400, 470)]
 
-### Create a table with all the features I want to implement on the 'Create Account' page, so I can loop and place them on the Frame
+     ### Create a table with all the features I want to implement on ###
+     ### the 'Create Account' page, so I can loop and place them on the Frame ###
 
 EntryTable = {}
 
@@ -213,7 +295,15 @@ CreateAccountLabelPage = construct(CreateAccountFrame, "Label", "Create Account"
 NextButton = construct(CreateAccountFrame, "Button", ">>", 400, 600, 25)
 NextButton.configure(width = 14, command = create_account)
 
+EntryTable["Password"].configure(show = "•")
+EntryTable["Confirm Password"].configure(show = "•")
+
+ErrorLabel = construct(CreateAccountFrame, "Label", "", 50, 550, 18)
+ErrorLabel.configure(fg = "#FF5555")
+
 ### Created the "Create Account" Frame" ###
+
+
 
 ForgotPasswordTitle = construct(ForgotPasswordFrame1, "Label", "Forgot Password", 50, 20, 50)
 EmailAddressLabel = construct(ForgotPasswordFrame1, "Label", "Email Address", 50, 150, 30)
@@ -229,6 +319,8 @@ BackToLogInButton.configure(width = 14, command = lambda: change_frame(ForgotPas
 
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
+
+
 SecurityQuestionsButton = construct(ForgotPasswordFrame2, "Button", ">>", 500, 600, 25)
 SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, LoginFrame))
 
@@ -238,6 +330,8 @@ BackToForgotPasswordButton.configure(width = 14, command = lambda: change_frame(
 ### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
 ### It will be created after my database is created, so I can extract the information
 ### The user is then redirected to the Log-In page so they can use their credentials to enter NitroNova
+
+
 
 HomePageLabel = construct(HomePageFrame, "Label", "Home Page", 50, 20, 50)
 BackFromHomePageButton = construct(HomePageFrame, "Button", "<<", 500, 600, 25)
