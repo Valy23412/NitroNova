@@ -41,6 +41,17 @@ class Database:
         return Row
         ### Finds the stored hashed password for a username. If none are found, None is returned ###
 
+    def get_security_questions(self, email):
+        connection = self.connectDatabase()
+        Query = connection.execute("""SELECT security_question_1, security_answer_1, 
+                                    security_question_2, security_answer_2
+                                    FROM users
+                                    WHERE email = ?""", [email])
+        Row = Query.fetchone()
+        connection.close()
+        return Row
+        ### Retrieves the security questions needed for the 'Forgot Password' process ###
+
     def insert_user(self, firstName, lastName, username, email, passwordHash, securityQ1, securityA1, securityQ2, securityA2):
         connection = self.connectDatabase()
         try:
@@ -61,9 +72,64 @@ class Database:
 ### Database class which contains different methods ###
 
 
+def email_checker(Email, errorpage):
+    if Email == "":
+        errorpage.configure(text="Email cannot be blank")
+        return False
+
+    if Email.count("@") != 1:
+        errorpage.configure(text="Email must contain exactly one @")
+        return False
+
+    AtPosition = Email.find("@")
+    if Email.startswith("@"):
+        errorpage.configure(text="Email must start with a name")
+        return False
+
+    DotPosition = Email.find(".", AtPosition + 1)
+    if DotPosition == -1:
+        errorpage.configure(text="Email must contain a dot after the @")
+        return False
+
+    DomainPart = Email[AtPosition + 1:].lower()
+    if DomainPart.startswith("gmail") == False and DomainPart.startswith("yahoo") == False:
+        errorpage.configure(text="Email must use gmail or yahoo")
+        return False
+
+    if DomainPart.endswith(".com") == False and DomainPart.endswith(".uk") == False:
+        errorpage.configure(text="Email must end with .com or .uk")
+        return False
+
+    return True
+
+def forgot_password_step1():
+    ForgotErrorLabel.configure(text="")
+
+    Email = EmailAddressEntry.get().strip()
+    ConfirmEmail = ConfirmEmailAddressEntry.get().strip()
+
+    if Email == "" or ConfirmEmail == "":
+        ForgotErrorLabel.configure(text="Please fill in both email fields")
+        return
+
+    if Email != ConfirmEmail:
+        ForgotErrorLabel.configure(text="Email addresses do not match")
+        return
+
+    ### REUSING your email_checker here ###
+    if email_checker(Email, ForgotErrorLabel) == False:
+        return
+
+    Row = DB.get_security_questions(Email)
+    if Row is None:
+        ForgotErrorLabel.configure(text="No account found with that email")
+        return
+
+    change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2)
+
 
 def create_account():
-    ErrorLabel.configure(text="") ### Ensures no previous error message is being shown ###
+    CreateAccountErrorLabel.configure(text="") ### Ensures no previous error message is being shown ###
 
     FirstName = EntryTable["First Name"].get().strip()
     LastName = EntryTable["Last Name"].get().strip()
@@ -79,44 +145,21 @@ def create_account():
     ### Storing all the information we get from the user ###
 
     if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == "" or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
-        ErrorLabel.configure(text="Ensure no fields are left blank")
+        CreateAccountErrorLabel.configure(text="Ensure no fields are left blank")
         return
     ### Making sure no fields are blank ###
 
-    if Email.count("@") != 1:
-        ErrorLabel.configure(text="Email must contain exactly one @")
+    if email_checker(Email, CreateAccountErrorLabel) == False:
         return
-
-    if Email.startswith("@"):
-        ErrorLabel.configure(text="Email must start with a name")
-        return
-
-    AtPosition = Email.find("@")
-    DotPosition = Email.find(".", AtPosition + 1)
-
-    if DotPosition == -1:
-        ErrorLabel.configure(text="Email must contain a dot after the @")
-        return
-    ### Ensures email syntax is correct ###
-
-    DomainPart = Email[AtPosition + 1:].lower()
-
-    if DomainPart.startswith("gmail") == False and DomainPart.startswith("yahoo") == False:
-        ErrorLabel.configure(text="Email must use gmail or yahoo")
-        return
-
-    if DomainPart.endswith(".com") == False and DomainPart.endswith(".uk") == False:
-        ErrorLabel.configure(text="Email must end with .com or .uk")
-        return
-    ### Checks for gmail or yahoo, ending in .com or .uk ###
+    ### It checks the email address ###
 
     if Password != ConfirmPassword:
-        ErrorLabel.configure(text= "Passwords do not match")
+        CreateAccountErrorLabel.configure(text="Passwords do not match")
         return
     ### Checking if the passwords match ###
 
     if len(Password) < 8:
-        ErrorLabel.configure(text="Password must be at least 8 characters")
+        CreateAccountErrorLabel.configure(text="Password must be at least 8 characters")
         return
 
     UppercaseFound = False
@@ -133,15 +176,15 @@ def create_account():
             NumberFound = True
 
     if UppercaseFound == False:
-        ErrorLabel.configure(text="Password needs at least one capital letter")
+        CreateAccountErrorLabel.configure(text="Password needs at least one capital letter")
         return
 
     if LowercaseFound == False:
-        ErrorLabel.configure(text="Password needs at least one lowercase letter")
+        CreateAccountErrorLabel.configure(text="Password needs at least one lowercase letter")
         return
 
     if NumberFound == False:
-        ErrorLabel.configure(text="Password needs at least one number")
+        CreateAccountErrorLabel.configure(text="Password needs at least one number")
         return
 
 
@@ -154,7 +197,7 @@ def create_account():
                            SecurityQuestion1, SecurityAnswer1, SecurityQuestion2, SecurityAnswer2)
 
     if Saved == False:
-        ErrorLabel.configure(text="Username or email already taken")
+        CreateAccountErrorLabel.configure(text="Username or email already taken")
         return
 
     ### Only navigate on success ###
@@ -298,8 +341,8 @@ NextButton.configure(width = 14, command = create_account)
 EntryTable["Password"].configure(show = "•")
 EntryTable["Confirm Password"].configure(show = "•")
 
-ErrorLabel = construct(CreateAccountFrame, "Label", "", 50, 550, 18)
-ErrorLabel.configure(fg = "#FF5555")
+CreateAccountErrorLabel = construct(CreateAccountFrame, "Label", "", 50, 550, 18)
+CreateAccountErrorLabel.configure(fg ="#FF5555")
 
 ### Created the "Create Account" Frame" ###
 
@@ -312,10 +355,13 @@ ConfirmEmailAddressLabel = construct(ForgotPasswordFrame1, "Label", "Confirm Ema
 ConfirmEmailAddressEntry = construct(ForgotPasswordFrame1, "Entry", "Confirm Email Address", 50, 330, 30)
 
 EmailAddressPageButton = construct(ForgotPasswordFrame1, "Button", ">>", 500, 600, 25)
-EmailAddressPageButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2))
+EmailAddressPageButton.configure(width = 14, command = forgot_password_step1)
 
 BackToLogInButton = construct(ForgotPasswordFrame1, "Button", "<<", 300, 600, 25)
 BackToLogInButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, LoginFrame))
+
+ForgotErrorLabel = construct(ForgotPasswordFrame1, "Label", "", 50, 370, 18)
+ForgotErrorLabel.configure(fg = "#FF5555")
 
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
