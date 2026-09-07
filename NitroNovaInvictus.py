@@ -69,7 +69,16 @@ class Database:
         connection.close()
         return Saved
 
+    def update_password(self, email, newHash):
+        ### Updates the password hash for a user identified by email ###
+        connection = self.connectDatabase()
+        connection.execute("""UPDATE users SET password_hash = ?
+                              WHERE email = ?""", (newHash, email))
+        connection.commit()
+        connection.close()
+
 ### Database class which contains different methods ###
+
 
 
 def email_checker(Email, errorpage):
@@ -102,6 +111,9 @@ def email_checker(Email, errorpage):
 
     return True
 
+
+
+
 def forgot_password_step1():
     ForgotErrorLabel.configure(text="")
 
@@ -119,14 +131,112 @@ def forgot_password_step1():
     ### REUSING your email_checker here ###
     if email_checker(Email, ForgotErrorLabel) == False:
         return
+Ph
+    global CurrentUserQuestions
+    CurrentUserQuestions = DB.get_security_questions(Email)
+    CurrentUserEmail = Email
 
-    Row = DB.get_security_questions(Email)
-    if Row is None:
+    if CurrentUserQuestions is None:
         ForgotErrorLabel.configure(text="No account found with that email")
         return
 
+    ### Loads the questions onto Frame 2 before switching ###
+    ForgotPasswordQuestion1.configure(text=CurrentUserQuestions[0])
+    ForgotPasswordQuestion2.configure(text=CurrentUserQuestions[2])
+
     change_frame(ForgotPasswordFrame1, ForgotPasswordFrame2)
 
+
+
+
+def forgot_password_step2():
+    ForgotErrorLabel2.configure(text="") ### Clears any previous error ###
+
+    Answer1 = ForgotPasswordAnswer1.get().strip()
+    Answer2 = ForgotPasswordAnswer2.get().strip()
+
+    if Answer1 == "" or Answer2 == "":
+        ForgotErrorLabel2.configure(text="Please answer both questions")
+        return
+
+    CorrectAnswer1 = CurrentUserQuestions[1].lower()
+    CorrectAnswer2 = CurrentUserQuestions[3].lower()
+
+    if Answer1.lower() != CorrectAnswer1 or Answer2.lower() != CorrectAnswer2:
+        ForgotErrorLabel2.configure(text="Incorrect answers")
+        return
+
+    ### Answers match — go to step 3 to set new password ###
+    change_frame(ForgotPasswordFrame2, ForgotPasswordFrame3)
+
+
+
+def forgot_password_step3():
+    ForgotErrorLabel3.configure(text="") ### Clears any previous error ###
+
+    NewPassword = NewPasswordEntry.get()
+    ConfirmNewPassword = ConfirmNewPasswordEntry.get()
+
+    if NewPassword == "" or ConfirmNewPassword == "":
+        ForgotErrorLabel3.configure(text="Please fill in both password fields")
+        return
+
+    ### Reuses the SAME password rules and validation as create_account ###
+    PasswordHash = validate_and_hash_password(NewPassword, ConfirmNewPassword, ForgotErrorLabel3)
+    if PasswordHash is None:
+        return
+
+    ### Update the database and redirect to Login ###
+    DB.update_password(CurrentUserEmail, PasswordHash)
+
+    ### Clear the entries so they don't stay visible ###
+    NewPasswordEntry.delete(0, tk.END)
+    ConfirmNewPasswordEntry.delete(0, tk.END)
+
+    ### Redirect to Login ###
+    change_frame(ForgotPasswordFrame3, LoginFrame)
+
+
+
+def validate_and_hash_password(Password, ConfirmPassword, errorpage):
+    ### Shared password rules used by create_account AND forgot_password_step3 ###
+    if Password != ConfirmPassword:
+        errorpage.configure(text="Passwords do not match")
+        return None
+
+    if len(Password) < 8:
+        errorpage.configure(text="Password must be at least 8 characters")
+        return None
+
+    UppercaseFound = False
+    LowercaseFound = False
+    NumberFound = False
+
+    ### Look through every character in the password ###
+    for Character in Password:
+        if Character.isupper():
+            UppercaseFound = True
+        if Character.islower():
+            LowercaseFound = True
+        if Character.isdigit():
+            NumberFound = True
+
+    if UppercaseFound == False:
+        errorpage.configure(text="Password needs at least one capital letter")
+        return None
+
+    if LowercaseFound == False:
+        errorpage.configure(text="Password needs at least one lowercase letter")
+        return None
+
+    if NumberFound == False:
+        errorpage.configure(text="Password needs at least one number")
+        return None
+
+    ### Hash the password and return it. Returns None if any rule fails ###
+    PasswordBytes = Password.encode()
+    Scrambled = hashlib.sha256(PasswordBytes)
+    return Scrambled.hexdigest()
 
 def create_account():
     CreateAccountErrorLabel.configure(text="") ### Ensures no previous error message is being shown ###
@@ -153,44 +263,10 @@ def create_account():
         return
     ### It checks the email address ###
 
-    if Password != ConfirmPassword:
-        CreateAccountErrorLabel.configure(text="Passwords do not match")
+    ### Validate the password and get the hash (None if any rule fails) ###
+    PasswordHash = validate_and_hash_password(Password, ConfirmPassword, CreateAccountErrorLabel)
+    if PasswordHash is None:
         return
-    ### Checking if the passwords match ###
-
-    if len(Password) < 8:
-        CreateAccountErrorLabel.configure(text="Password must be at least 8 characters")
-        return
-
-    UppercaseFound = False
-    LowercaseFound = False
-    NumberFound = False
-
-    ### Look through every character in the password ###
-    for Character in Password:
-        if Character.isupper():
-            UppercaseFound = True
-        if Character.islower():
-            LowercaseFound = True
-        if Character.isdigit():
-            NumberFound = True
-
-    if UppercaseFound == False:
-        CreateAccountErrorLabel.configure(text="Password needs at least one capital letter")
-        return
-
-    if LowercaseFound == False:
-        CreateAccountErrorLabel.configure(text="Password needs at least one lowercase letter")
-        return
-
-    if NumberFound == False:
-        CreateAccountErrorLabel.configure(text="Password needs at least one number")
-        return
-
-
-    PasswordBytes = Password.encode()  #Turn the password into bytes
-    Scrambled = hashlib.sha256(PasswordBytes)  #Blend
-    PasswordHash = Scrambled.hexdigest()  #Blend into text to store
 
     ### Save to the database using the Database class ###
     Saved = DB.insert_user(FirstName, LastName, Username, Email, PasswordHash,
@@ -199,6 +275,7 @@ def create_account():
     if Saved == False:
         CreateAccountErrorLabel.configure(text="Username or email already taken")
         return
+
 
     ### Only navigate on success ###
     change_frame(CreateAccountFrame, LoginFrame)
@@ -244,6 +321,9 @@ def login():
 DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
 DB.create_table() ### One Database object shared by the whole app ###
 
+CurrentUserQuestions = None ### Stores the security questions & answers fetched in step 1 ###
+CurrentUserEmail = None ### Stores the email so step 3 can update the right account ###
+
 Window = tk.Tk()
 Window.geometry("700x700")
 Window.title("NitroNova")
@@ -253,10 +333,11 @@ LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
 
 ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
+ForgotPasswordFrame3 = tk.Frame(Window, bg="#0A0A2A")
 CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
 HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
 
-### Window configuration and frames are established ###
+### Windows and frames are created ###
 
 
 def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
@@ -360,22 +441,54 @@ EmailAddressPageButton.configure(width = 14, command = forgot_password_step1)
 BackToLogInButton = construct(ForgotPasswordFrame1, "Button", "<<", 300, 600, 25)
 BackToLogInButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame1, LoginFrame))
 
-ForgotErrorLabel = construct(ForgotPasswordFrame1, "Label", "", 50, 370, 18)
+ForgotErrorLabel = construct(ForgotPasswordFrame1, "Label", "", 50, 390, 18)
 ForgotErrorLabel.configure(fg = "#FF5555")
 
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
+ForgotPasswordTitle2 = construct(ForgotPasswordFrame2, "Label", "Answer Security Questions", 50, 20, 40)
+
+ForgotPasswordQuestion1 = construct(ForgotPasswordFrame2, "Label", "", 50, 150, 25)
+ForgotPasswordAnswer1 = construct(ForgotPasswordFrame2, "Entry", "", 50, 210, 25)
+
+ForgotPasswordQuestion2 = construct(ForgotPasswordFrame2, "Label", "", 50, 300, 25)
+ForgotPasswordAnswer2 = construct(ForgotPasswordFrame2, "Entry", "", 50, 360, 25)
+
+ForgotErrorLabel2 = construct(ForgotPasswordFrame2, "Label", "", 50, 420, 18)
+ForgotErrorLabel2.configure(fg = "#FF5555")
 
 
 SecurityQuestionsButton = construct(ForgotPasswordFrame2, "Button", ">>", 500, 600, 25)
-SecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, LoginFrame))
+SecurityQuestionsButton.configure(width = 14, command = forgot_password_step2)
 
 BackToForgotPasswordButton = construct(ForgotPasswordFrame2, "Button", "<<", 300, 600, 25)
 BackToForgotPasswordButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, ForgotPasswordFrame1))
 
 ### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
 ### It will be created after my database is created, so I can extract the information
-### The user is then redirected to the Log-In page so they can use their credentials to enter NitroNova
+### The user is then redirected to Frame 3 to set a new password ###
+
+ForgotPasswordTitle3 = construct(ForgotPasswordFrame3, "Label", "Set New Password", 50, 20, 40)
+
+NewPasswordLabel = construct(ForgotPasswordFrame3, "Label", "New Password", 50, 150, 25)
+NewPasswordEntry = construct(ForgotPasswordFrame3, "Entry", "New Password", 50, 210, 25)
+NewPasswordEntry.configure(show = "•")
+
+ConfirmNewPasswordLabel = construct(ForgotPasswordFrame3, "Label", "Confirm New Password", 50, 300, 25)
+ConfirmNewPasswordEntry = construct(ForgotPasswordFrame3, "Entry", "Confirm New Password", 50, 360, 25)
+ConfirmNewPasswordEntry.configure(show = "•")
+
+ForgotErrorLabel3 = construct(ForgotPasswordFrame3, "Label", "", 50, 420, 18)
+ForgotErrorLabel3.configure(fg = "#FF5555")
+
+ResetPasswordButton = construct(ForgotPasswordFrame3, "Button", ">>", 500, 600, 25)
+ResetPasswordButton.configure(width = 14, command = forgot_password_step3)
+
+BackToSecurityQuestionsButton = construct(ForgotPasswordFrame3, "Button", "<<", 300, 600, 25)
+BackToSecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame3, ForgotPasswordFrame2))
+
+### Created the 3rd "Forgot Password" Frame where the user sets their new password.
+### On success, the database is updated and the user returns to Login ###
 
 
 
