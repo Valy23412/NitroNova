@@ -1,6 +1,7 @@
 import tkinter as tk
 import sqlite3
 import hashlib
+import tkinter.messagebox
 
 
 
@@ -131,8 +132,9 @@ def forgot_password_step1():
     ### REUSING your email_checker here ###
     if email_checker(Email, ForgotErrorLabel) == False:
         return
-Ph
+
     global CurrentUserQuestions
+    global CurrentUserEmail
     CurrentUserQuestions = DB.get_security_questions(Email)
     CurrentUserEmail = Email
 
@@ -233,7 +235,7 @@ def validate_and_hash_password(Password, ConfirmPassword, errorpage):
         errorpage.configure(text="Password needs at least one number")
         return None
 
-    ### Hash the password and return it. Returns None if any rule fails ###
+    ### Hash the password and returns it ###
     PasswordBytes = Password.encode()
     Scrambled = hashlib.sha256(PasswordBytes)
     return Scrambled.hexdigest()
@@ -252,7 +254,7 @@ def create_account():
     SecurityQuestion2 = EntryTable["Security Question 2"].get().strip()
     SecurityAnswer2 = EntryTable["Correct Answer 2"].get().strip()
 
-    ### Storing all the information we get from the user ###
+    ### Storing all the information we get it from the user ###
 
     if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == "" or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
         CreateAccountErrorLabel.configure(text="Ensure no fields are left blank")
@@ -263,7 +265,7 @@ def create_account():
         return
     ### It checks the email address ###
 
-    ### Validate the password and get the hash (None if any rule fails) ###
+    ### Validate the password and get the hash ###
     PasswordHash = validate_and_hash_password(Password, ConfirmPassword, CreateAccountErrorLabel)
     if PasswordHash is None:
         return
@@ -312,10 +314,30 @@ def login():
         return
 
     ### Access granted that allows the user to reach Home ###
+    Window.geometry("1200x700")
     change_frame(LoginFrame, HomePageFrame)
 
 ### Function that deals with the Log In authentication ###
 
+def logout():
+    Result = tk.messagebox.askyesno("Log Out", "Are you sure you want to log out?")
+    if Result == True:
+        Window.geometry("700x700")
+        change_frame(HomePageFrame, LoginFrame)
+
+### Functions that makes sure the user wants to log out ###
+
+def search_focus_in(Event):
+    if SearchBar.get() == "Search songs, artists...":
+        SearchBar.delete(0, tk.END)
+        SearchBar.configure(fg="#E8FFF0")
+
+def search_focus_out(Event):
+    if SearchBar.get() == "":
+        SearchBar.insert(0, "Search songs, artists...")
+        SearchBar.configure(fg="#808080")
+
+### Functions that allows me to put text in the search bar, that dissapears when the user clicks onn it ###
 
 
 DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
@@ -335,7 +357,9 @@ ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame3 = tk.Frame(Window, bg="#0A0A2A")
 CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
-HomePageFrame = tk.Frame(Window, bg="#0A0A2A")
+HomePageFrame = tk.Frame(Window, bg="#2C3863")
+ProfileFrame = tk.Frame(Window, bg="#0A0A2A")
+SettingsFrame = tk.Frame(Window, bg="#0A0A2A")
 
 ### Windows and frames are created ###
 
@@ -357,7 +381,8 @@ def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
         widget = tk.Button(typeOfFrame,
                            text=textOfLabel,
                            font=("Agency FB", sizeOfWidget, "bold"),
-                           bg="#40E0D0")
+                           bg="#40E0D0",
+                           cursor="hand2")
 
     if clickable and typeOfWidget == "Label":
         widget.configure(cursor="hand2")
@@ -490,12 +515,82 @@ BackToSecurityQuestionsButton.configure(width = 14, command = lambda: change_fra
 ### Created the 3rd "Forgot Password" Frame where the user sets their new password.
 ### On success, the database is updated and the user returns to Login ###
 
+HeaderFrame = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
+HeaderFrame.place(x=175, y=0, relwidth=1)
+HeaderFrame.pack_propagate(False)
+
+SuggestedFrame = tk.Frame(HomePageFrame, bg="#0A0A2A")
+SuggestedFrame.place(x=175, y=62, relwidth=1, height=180)
+
+PlaylistsFrame = tk.Frame(HomePageFrame, bg="#0A0A2A")
+PlaylistsFrame.place(x=175, y=242, relwidth=1, height=396)
+
+PlayerBar = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
+PlayerBar.place(x=175, y=640, relwidth=1)
+PlayerBar.pack_propagate(False)
 
 
-HomePageLabel = construct(HomePageFrame, "Label", "Home Page", 50, 20, 50)
-BackFromHomePageButton = construct(HomePageFrame, "Button", "<<", 500, 600, 25)
-BackFromHomePageButton.configure(width = 14, command = lambda: change_frame(HomePageFrame, LoginFrame))
 
-### Created "Home Page" Frame ###
+Divider1 = tk.Frame(HomePageFrame, bg="#1A1A4A", height=4)
+Divider1.place(x=175, y=60, relwidth=1)
+
+Divider2 = tk.Frame(HomePageFrame, bg="#1A1A4A", height=4)
+Divider2.place(x=175, y=242, relwidth=1)
+
+Divider3 = tk.Frame(HomePageFrame, bg="#1A1A4A", height=4)
+Divider3.place(x=175, y=636, relwidth=1)
+
+### Splits the main home page into different subsections that organises the app ###
+
+
+SearchBar = tk.Entry(HomePageFrame, font=("Agency FB", 25), bg="#2c3863", fg="#000000", insertbackground="#E8FFF0", bd=0,highlightthickness=0)
+SearchBar.place(x=200, y=10, width=300, height=40)
+SearchBar.insert(0, "Search songs, artists...")
+SearchBar.bind("<FocusIn>", search_focus_in)
+SearchBar.bind("<FocusOut>", search_focus_out)
+
+### Setting up the search bar ###
+
+SidebarTitleLabel = tk.Label(HomePageFrame, text="NitroNova", font=("Agency FB", 35, "bold"), bg = "#2C3863")
+SidebarTitleLabel.place(x=10, y=15)
+SidebarDivider = tk.Frame(HomePageFrame, bg="#000000", width=4)
+SidebarDivider.place(x=175, y=0, height=700)
+
+ProfileLabel = tk.Label(HomePageFrame, text="Profile", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+ProfileLabel.place(x=10, y=120)
+ProfileLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, ProfileFrame))
+
+SettingsLabel = tk.Label(HomePageFrame, text="Settings", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+SettingsLabel.place(x=10, y=150)
+SettingsLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, SettingsFrame))
+
+SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
+SearchButton.place(x=520, y=12, width=40, height=36)
+
+LogoutLabel = tk.Label(HomePageFrame, text="Log Out", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+LogoutLabel.place(x=10, y=660)
+LogoutLabel.bind("<Button-1>", lambda e: logout())
+
+PreviousButton = tk.Button(PlayerBar, text="⏮", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
+PreviousButton.place(x=10, y=10, width=40, height=40)
+
+PlayButton = tk.Button(PlayerBar, text="▶", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
+PlayButton.place(x=55, y=10, width=40, height=40)
+
+NextButton = tk.Button(PlayerBar, text="⏭", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
+NextButton.place(x=100, y=10, width=40, height=40)
+
+MoreButton = tk.Button(PlayerBar, text="⋯", font=("Segoe UI Emoji", 22), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
+MoreButton.place(x=900, y=10, width=40, height=40)
+
+ExpandButton = tk.Button(PlayerBar, text="▲", font=("Segoe UI Emoji", 22), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
+ExpandButton.place(x=950, y=10, width=40, height=40)
+
+ProfileBackButton = construct(ProfileFrame, "Button", "<< Back", 20, 20, 20)
+ProfileBackButton.configure(width=10, command=lambda: change_frame(ProfileFrame, HomePageFrame))
+
+SettingsBackButton = construct(SettingsFrame, "Button", "<< Back", 20, 20, 20)
+SettingsBackButton.configure(width=10, command=lambda: change_frame(SettingsFrame, HomePageFrame))
+### Developed "Home Page" Frame ###
 
 Window.mainloop()
