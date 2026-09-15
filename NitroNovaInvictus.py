@@ -337,8 +337,23 @@ def search_focus_out(Event):
         SearchBar.insert(0, "Search songs, artists...")
         SearchBar.configure(fg="#808080")
 
-### Functions that allows me to put text in the search bar, that dissapears when the user clicks onn it ###
+### Functions that allows me to put text in the search bar, that disappears when the user clicks onn it ###
 
+def change_button_text(Button, NewText):
+    Button.configure(text=NewText)
+
+def toggle_play():
+    if PlayButton.cget("text") == "▶":
+        change_button_text(PlayButton, "⏸")
+    elif PlayButton.cget("text") == "⏸":
+        change_button_text(PlayButton, "▶")
+
+    elif PlayButton.cget("text") == "▼":
+        change_button_text(PlayButton, "▲")
+    elif PlayButton.cget("text") == "▲":
+        change_button_text(PlayButton, "▼")
+
+### Functions that allows me to change the purpose of the same button ###
 
 DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
 DB.create_table() ### One Database object shared by the whole app ###
@@ -360,6 +375,7 @@ CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
 HomePageFrame = tk.Frame(Window, bg="#2C3863")
 ProfileFrame = tk.Frame(Window, bg="#0A0A2A")
 SettingsFrame = tk.Frame(Window, bg="#0A0A2A")
+OfflineFrame = tk.Frame(Window, bg="#0A0A2A")
 
 ### Windows and frames are created ###
 
@@ -399,6 +415,7 @@ def change_frame(current, target):
     target.place(x= 0, y= 0, relwidth= 1, relheight= 1)
 
 ### Function that enables frames to be swaped, needs 2 parameters: One for the current frame, and the other for the frame you want to switch to ###
+
 
 
 
@@ -513,7 +530,7 @@ BackToSecurityQuestionsButton = construct(ForgotPasswordFrame3, "Button", "<<", 
 BackToSecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame3, ForgotPasswordFrame2))
 
 ### Created the 3rd "Forgot Password" Frame where the user sets their new password.
-### On success, the database is updated and the user returns to Login ###
+### On success, the database is updated and the user returns to Log In ###
 
 HeaderFrame = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
 HeaderFrame.place(x=175, y=0, relwidth=1)
@@ -561,21 +578,28 @@ ProfileLabel.place(x=10, y=120)
 ProfileLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, ProfileFrame))
 
 SettingsLabel = tk.Label(HomePageFrame, text="Settings", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
-SettingsLabel.place(x=10, y=150)
+SettingsLabel.place(x=10, y=160)
 SettingsLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, SettingsFrame))
 
-SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
-SearchButton.place(x=520, y=12, width=40, height=36)
+OfflineLabel = tk.Label(HomePageFrame, text="Offline", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+OfflineLabel.place(x=10, y=200)
+OfflineLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, OfflineFrame))
 
 LogoutLabel = tk.Label(HomePageFrame, text="Log Out", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
 LogoutLabel.place(x=10, y=660)
 LogoutLabel.bind("<Button-1>", lambda e: logout())
+
+### Created all the labels on the Home Page ###
+
+SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
+SearchButton.place(x=520, y=12, width=40, height=36)
 
 PreviousButton = tk.Button(PlayerBar, text="⏮", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
 PreviousButton.place(x=10, y=10, width=40, height=40)
 
 PlayButton = tk.Button(PlayerBar, text="▶", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
 PlayButton.place(x=55, y=10, width=40, height=40)
+PlayButton.configure(command=toggle_play)
 
 NextButton = tk.Button(PlayerBar, text="⏭", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
 NextButton.place(x=100, y=10, width=40, height=40)
@@ -585,12 +609,21 @@ MoreButton.place(x=900, y=10, width=40, height=40)
 
 ExpandButton = tk.Button(PlayerBar, text="▲", font=("Segoe UI Emoji", 22), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
 ExpandButton.place(x=950, y=10, width=40, height=40)
+ExpandButton.configure(command=toggle_play)
 
 ProfileBackButton = construct(ProfileFrame, "Button", "<< Back", 20, 20, 20)
 ProfileBackButton.configure(width=10, command=lambda: change_frame(ProfileFrame, HomePageFrame))
 
 SettingsBackButton = construct(SettingsFrame, "Button", "<< Back", 20, 20, 20)
 SettingsBackButton.configure(width=10, command=lambda: change_frame(SettingsFrame, HomePageFrame))
+
+### Created all the buttons on the Home Page ###
 ### Developed "Home Page" Frame ###
+
+OfflineTitle = construct(OfflineFrame, "Label", "Downloaded Songs", 20, 20, 40)
+OfflineBackButton = construct(OfflineFrame, "Button", "<< Back", 20, 600, 20)
+OfflineBackButton.configure(width=10, command=lambda: change_frame(OfflineFrame, HomePageFrame))
+
+### Created the "Offline frame"
 
 Window.mainloop()
