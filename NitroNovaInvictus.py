@@ -2,6 +2,8 @@ import tkinter as tk
 import sqlite3
 import hashlib
 import tkinter.messagebox
+import tkinter.filedialog
+from PIL import Image, ImageTk
 
 
 
@@ -27,9 +29,27 @@ class Database:
             security_question_2 TEXT,
             security_answer_2 TEXT
         );""")
+
+        try:
+            connection.execute("""ALTER TABLE users 
+                                  ADD COLUMN profile_pic TEXT""")
+        except sqlite3.OperationalError:
+            pass
+
         connection.commit()
         connection.close()
         ### Create the users table if it doesn't exist ###
+
+    def get_user_details(self, username):
+        ### Fetches the public info for a username so the Profile page can display it ###
+        connection = self.connectDatabase()
+        Query = connection.execute("""SELECT first_name, last_name, username, email, profile_pic
+                                      FROM users
+                                      WHERE username = ?""",
+                                   [username])
+        Row = Query.fetchone()
+        connection.close()
+        return Row
 
     def get_password_hash(self, username):
         connection = self.connectDatabase()
@@ -78,9 +98,108 @@ class Database:
         connection.commit()
         connection.close()
 
-### Database class which contains different methods ###
+    def update_user(self, OldUsername, firstName, lastName, email, NewUsername):
+        ### Updates first name, last name, email and username for a given user ###
+        connection = self.connectDatabase()
+        try:
+            connection.execute("""UPDATE users
+                                    SET first_name = ?, last_name = ?, email = ?, username = ?
+                                    WHERE username = ?""",
+                               (firstName, lastName, email, NewUsername, OldUsername))
+            connection.commit()
+            Updated = True
+        except sqlite3.IntegrityError:
+            Updated = False
+        connection.close()
+        return Updated
+
+    def update_profile_pic(self, username, path):
+        ### Stores the chosen profile picture path for a user ###
+        connection = self.connectDatabase()
+        connection.execute("UPDATE users SET profile_pic = ? WHERE username = ?", (path, username))
+        connection.commit()
+        connection.close()
 
 
+### Database class which contains different methods helping me manipulate my current database ###
+
+class ProfileManager:
+
+    def save_profile_changes(self):
+        ### Only updates fields that were changed, keeps the old value if blank ###
+        global CurrentUsername
+
+        NewFirstName = UpdateFirstNameEntry.get().strip()
+        NewLastName = UpdateLastNameEntry.get().strip()
+        NewEmail = UpdateEmailEntry.get().strip()
+        NewUsername = UpdateUsernameEntry.get().strip()
+
+        Details = DB.get_user_details(CurrentUsername)
+
+        if NewFirstName == "":
+            NewFirstName = Details[0]
+        if NewLastName == "":
+            NewLastName = Details[1]
+        if NewEmail == "":
+            NewEmail = Details[3]
+        if NewUsername == "":
+            NewUsername = Details[2]
+
+        ### if there the boxes were left blank, the system will just use the previous data ###
+
+        if email_checker(NewEmail, UpdateErrorLabel) == False:
+            return
+
+        Saved = DB.update_user(CurrentUsername, NewFirstName, NewLastName, NewEmail, NewUsername)
+
+        if Saved == False:
+            UpdateErrorLabel.configure(text="That email is already taken")
+            return
+
+        CurrentUsername = NewUsername
+        ### Only save the photo if a new one was picked, BEFORE refreshing the page ###
+        if PendingProfilePic:
+            DB.update_profile_pic(CurrentUsername, PendingProfilePic)
+        UpdateErrorLabel.configure(text="Profile updated!")
+        self.load_profile()
+
+
+    def load_profile(self):
+        ### Fills the Profile page labels using the username stored at login ###
+        Details = DB.get_user_details(CurrentUsername)
+
+        if Details is None:
+            return
+
+        ProfileNameLabel.configure(text=Details[0] + " " + Details[1])
+        ProfileUsernameLabel.configure(text="@" + Details[2])
+        ProfileEmailLabel.configure(text=Details[3])
+        ProfileSinceLabel.configure(text="Member since: September 2026")
+
+        ### Load the profile picture and shrink it to a small portrait ###
+        try:
+            OpenedImage = Image.open(Details[4])
+            OpenedImage.thumbnail((100, 100))
+            ProfileImage = ImageTk.PhotoImage(OpenedImage)
+            ProfileManager.ProfileImage = ProfileImage  ### keep a reference so it isn't deleted ###
+            ProfilePicLabel.configure(image=ProfileImage)
+        except (tk.TclError, TypeError, OSError):
+            ProfilePicLabel.configure(image="", text="No photo")
+
+    def open_profile(self):
+        ### Loads the user's details, then shows the Profile page ###
+        ProfileManager().load_profile()
+        change_frame(HomePageFrame, ProfileFrame)
+
+### Profile class containing all the subroutines I need in developing and maintaining my page ###
+
+def choose_profile_pic():
+    ### Opens the file picker so the user can select an image ###
+    global PendingProfilePic
+    PendingProfilePic = tk.filedialog.askopenfilename(
+        title="Choose a profile picture",
+        filetypes=[("Image files", "*.png *.gif")]
+    )
 
 def email_checker(Email, errorpage):
     if Email == "":
@@ -259,7 +378,8 @@ def create_account():
     if (FirstName == "" or LastName == "" or Email == "" or Password == "" or ConfirmPassword == "" or Username == "" or SecurityQuestion1 == "" or SecurityAnswer1 == "" or SecurityQuestion2 == "" or SecurityAnswer2 == ""):
         CreateAccountErrorLabel.configure(text="Ensure no fields are left blank")
         return
-    ### Making sure no fields are blank ###
+
+    ### Making sure no fields are blank, if there are, stop and show an error ###
 
     if email_checker(Email, CreateAccountErrorLabel) == False:
         return
@@ -313,17 +433,20 @@ def login():
         LoginErrorLabel.configure(text="Incorrect password")
         return
 
+    global CurrentUsername
+    CurrentUsername = Username
+
     ### Access granted that allows the user to reach Home ###
     Window.geometry("1200x700")
     change_frame(LoginFrame, HomePageFrame)
 
 ### Function that deals with the Log In authentication ###
 
-def logout():
+def logout(Frame):
     Result = tk.messagebox.askyesno("Log Out", "Are you sure you want to log out?")
     if Result == True:
         Window.geometry("700x700")
-        change_frame(HomePageFrame, LoginFrame)
+        change_frame(Frame, LoginFrame)
 
 ### Functions that makes sure the user wants to log out ###
 
@@ -358,8 +481,10 @@ def toggle_play():
 DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
 DB.create_table() ### One Database object shared by the whole app ###
 
+CurrentUsername = None
 CurrentUserQuestions = None ### Stores the security questions & answers fetched in step 1 ###
 CurrentUserEmail = None ### Stores the email so step 3 can update the right account ###
+PendingProfilePic = None
 
 Window = tk.Tk()
 Window.geometry("700x700")
@@ -367,7 +492,6 @@ Window.title("NitroNova")
 
 LoginFrame = tk.Frame(Window, bg="#0A0A2A")
 LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
-
 ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
 ForgotPasswordFrame3 = tk.Frame(Window, bg="#0A0A2A")
@@ -376,8 +500,9 @@ HomePageFrame = tk.Frame(Window, bg="#2C3863")
 ProfileFrame = tk.Frame(Window, bg="#0A0A2A")
 SettingsFrame = tk.Frame(Window, bg="#0A0A2A")
 OfflineFrame = tk.Frame(Window, bg="#0A0A2A")
+UpdateProfileFrame = tk.Frame(Window, bg="#0A0A2A", width=1100, height=250)
 
-### Windows and frames are created ###
+### Windows and the main frames for each screen are created ###
 
 
 def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
@@ -488,6 +613,8 @@ ForgotErrorLabel.configure(fg = "#FF5555")
 
 ### Created the 1st "Forgot Password" Frame that will use the email address to search the security questions in the database ###
 
+
+
 ForgotPasswordTitle2 = construct(ForgotPasswordFrame2, "Label", "Answer Security Questions", 50, 20, 40)
 
 ForgotPasswordQuestion1 = construct(ForgotPasswordFrame2, "Label", "", 50, 150, 25)
@@ -506,9 +633,14 @@ SecurityQuestionsButton.configure(width = 14, command = forgot_password_step2)
 BackToForgotPasswordButton = construct(ForgotPasswordFrame2, "Button", "<<", 300, 600, 25)
 BackToForgotPasswordButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame2, ForgotPasswordFrame1))
 
+
+
 ### Created the 2nd "Forgot Password" Frame that will ask the user the 2 security questions.
 ### It will be created after my database is created, so I can extract the information
 ### The user is then redirected to Frame 3 to set a new password ###
+
+
+
 
 ForgotPasswordTitle3 = construct(ForgotPasswordFrame3, "Label", "Set New Password", 50, 20, 40)
 
@@ -529,8 +661,12 @@ ResetPasswordButton.configure(width = 14, command = forgot_password_step3)
 BackToSecurityQuestionsButton = construct(ForgotPasswordFrame3, "Button", "<<", 300, 600, 25)
 BackToSecurityQuestionsButton.configure(width = 14, command = lambda: change_frame(ForgotPasswordFrame3, ForgotPasswordFrame2))
 
+
+
 ### Created the 3rd "Forgot Password" Frame where the user sets their new password.
 ### On success, the database is updated and the user returns to Log In ###
+
+
 
 HeaderFrame = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
 HeaderFrame.place(x=175, y=0, relwidth=1)
@@ -541,6 +677,9 @@ SuggestedFrame.place(x=175, y=62, relwidth=1, height=180)
 
 PlaylistsFrame = tk.Frame(HomePageFrame, bg="#0A0A2A")
 PlaylistsFrame.place(x=175, y=242, relwidth=1, height=396)
+
+SidebarFrame = tk.Frame(HomePageFrame, bg="#2C3863", width=175)
+SidebarFrame.place(x=0, y=0, relheight=1)
 
 PlayerBar = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
 PlayerBar.place(x=175, y=640, relwidth=1)
@@ -557,6 +696,7 @@ Divider2.place(x=175, y=242, relwidth=1)
 Divider3 = tk.Frame(HomePageFrame, bg="#1A1A4A", height=4)
 Divider3.place(x=175, y=636, relwidth=1)
 
+
 ### Splits the main home page into different subsections that organises the app ###
 
 
@@ -566,6 +706,7 @@ SearchBar.insert(0, "Search songs, artists...")
 SearchBar.bind("<FocusIn>", search_focus_in)
 SearchBar.bind("<FocusOut>", search_focus_out)
 
+
 ### Setting up the search bar ###
 
 SidebarTitleLabel = tk.Label(HomePageFrame, text="NitroNova", font=("Agency FB", 35, "bold"), bg = "#2C3863")
@@ -573,23 +714,42 @@ SidebarTitleLabel.place(x=10, y=15)
 SidebarDivider = tk.Frame(HomePageFrame, bg="#000000", width=4)
 SidebarDivider.place(x=175, y=0, height=700)
 
-ProfileLabel = tk.Label(HomePageFrame, text="Profile", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
-ProfileLabel.place(x=10, y=120)
-ProfileLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, ProfileFrame))
+SidebarDivider1 = tk.Frame(SidebarFrame, bg="#1A1A4A", height=2, width=155)
+SidebarDivider1.place(x=10, y=90)
 
-SettingsLabel = tk.Label(HomePageFrame, text="Settings", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+SidebarDivider2 = tk.Frame(SidebarFrame, bg="#1A1A4A", height=2, width=155)
+SidebarDivider2.place(x=10, y=240)
+
+SidebarDivider3 = tk.Frame(SidebarFrame, bg="#1A1A4A", height=2, width=155)
+SidebarDivider3.place(x=10, y=640)
+
+### These split my page into different sections that I can add features on ###
+
+
+ProfileLabel = tk.Label(SidebarFrame, text="Profile", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+ProfileLabel.place(x=10, y=120)
+ProfileLabel.bind("<Button-1>", lambda e: ProfileManager().open_profile())
+
+SettingsLabel = tk.Label(SidebarFrame, text="Settings", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
 SettingsLabel.place(x=10, y=160)
 SettingsLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, SettingsFrame))
 
-OfflineLabel = tk.Label(HomePageFrame, text="Offline", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
+OfflineLabel = tk.Label(SidebarFrame, text="Offline", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
 OfflineLabel.place(x=10, y=200)
 OfflineLabel.bind("<Button-1>", lambda e: change_frame(HomePageFrame, OfflineFrame))
 
-LogoutLabel = tk.Label(HomePageFrame, text="Log Out", font=("Agency FB", 20, "bold"), bg="#2c3863", cursor="hand2")
-LogoutLabel.place(x=10, y=660)
-LogoutLabel.bind("<Button-1>", lambda e: logout())
+SuggestedTracksLabel = tk.Label(SuggestedFrame, text="Suggested Tracks", font=("Agency FB", 25, "bold"), bg="#0A0A2A", fg="#E8FFF0")
+SuggestedTracksLabel.place(x=10, y=5)
+
+YourPlaylistsLabel = tk.Label(PlaylistsFrame, text="Your Playlists", font=("Agency FB", 25, "bold"), bg="#0A0A2A", fg="#E8FFF0")
+YourPlaylistsLabel.place(x=10, y=5)
+
+NowPlayingLabel = tk.Label(PlayerBar, text="Nothing is played", font=("Agency FB", 25, "bold"), bg="#0A0A2A", fg="#E8FFF0")
+NowPlayingLabel.place(x=150, y=10)
 
 ### Created all the labels on the Home Page ###
+
+
 
 SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
 SearchButton.place(x=520, y=12, width=40, height=36)
@@ -611,10 +771,7 @@ ExpandButton = tk.Button(PlayerBar, text="▲", font=("Segoe UI Emoji", 22), bg=
 ExpandButton.place(x=950, y=10, width=40, height=40)
 ExpandButton.configure(command=toggle_play)
 
-ProfileBackButton = construct(ProfileFrame, "Button", "<< Back", 20, 20, 20)
-ProfileBackButton.configure(width=10, command=lambda: change_frame(ProfileFrame, HomePageFrame))
-
-SettingsBackButton = construct(SettingsFrame, "Button", "<< Back", 20, 20, 20)
+SettingsBackButton = construct(SettingsFrame, "Button", "<< Back", 1050, 20, 20)
 SettingsBackButton.configure(width=10, command=lambda: change_frame(SettingsFrame, HomePageFrame))
 
 ### Created all the buttons on the Home Page ###
@@ -624,6 +781,94 @@ OfflineTitle = construct(OfflineFrame, "Label", "Downloaded Songs", 20, 20, 40)
 OfflineBackButton = construct(OfflineFrame, "Button", "<< Back", 20, 600, 20)
 OfflineBackButton.configure(width=10, command=lambda: change_frame(OfflineFrame, HomePageFrame))
 
-### Created the "Offline frame"
+ProfileTitleLabel = construct(ProfileFrame, "Label", "Profile", 50, 20, 40)
+EditProfileLabel = construct(ProfileFrame, "Label", "Edit Account", 800, 40, 20)
+EditProfileLabel.bind("<Button-1>", lambda e: change_frame(ProfileFrame, UpdateProfileFrame))
+
+ProfileCard = tk.Frame(ProfileFrame, bg="#1A1A4A", width=1100, height=250)
+ProfileCard.place(x=50, y=100)
+ProfileCard.pack_propagate(False)
+
+ProfilePicLabel = construct(ProfileCard, "Label", "", 40, 70, 20)
+ProfilePicLabel.configure(bg="#1A1A4A")
+
+ProfileNameLabel = construct(ProfileCard, "Label", "Name", 500, 20, 20)
+ProfileNameLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+ProfileUsernameLabel = construct(ProfileCard, "Label", "Username", 500, 70, 20)
+ProfileUsernameLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+ProfileEmailLabel = construct(ProfileCard, "Label", "Email Address", 500, 120, 20)
+ProfileEmailLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+ProfileSinceLabel = construct(ProfileCard, "Label", "Member since:", 500, 170, 20)
+ProfileSinceLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+LogoutLabel = construct(ProfileFrame, "Label", "Log Out", 1000, 40, 20, clickable=True)
+LogoutLabel.bind("<Button-1>", lambda e: logout(ProfileFrame))
+
+ProfileBackButton = construct(ProfileFrame, "Button", "<< Back", 1050, 600, 20)
+ProfileBackButton.configure(width=10, command=lambda: change_frame(ProfileFrame, HomePageFrame))
+
+### The upper section of my home page has been developed with lables and buttons##
+
+PlaylistStatCard = tk.Frame(ProfileFrame, bg="#1A1A4A", width=280, height=110)
+PlaylistStatCard.place(x=50, y=380)
+PlaylistStatCard.pack_propagate(False)
+
+PlaylistStatNumber = construct(PlaylistStatCard, "Label", "0", 100, 10, 40)
+PlaylistStatNumber.configure(fg="#40E0D0", bg="#1A1A4A")
+
+PlaylistStatTitle = construct(PlaylistStatCard, "Label", "Playlists", 80, 70, 18)
+PlaylistStatTitle.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+DownloadStatCard = tk.Frame(ProfileFrame, bg="#1A1A4A", width=280, height=110)
+DownloadStatCard.place(x=460, y=380)
+DownloadStatCard.pack_propagate(False)
+
+DownloadStatNumber = construct(DownloadStatCard, "Label", "0", 100, 10, 40)
+DownloadStatNumber.configure(fg="#40E0D0", bg="#1A1A4A")
+
+DownloadStatTitle = construct(DownloadStatCard, "Label", "Downloads", 80, 70, 18)
+DownloadStatTitle.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+PlayedStatCard = tk.Frame(ProfileFrame, bg="#1A1A4A", width=280, height=110)
+PlayedStatCard.place(x=870, y=380)
+PlayedStatCard.pack_propagate(False)
+
+PlayedStatNumber = construct(PlayedStatCard, "Label", "0", 100, 10, 40)
+PlayedStatNumber.configure(fg="#40E0D0", bg="#1A1A4A")
+
+PlayedStatTitle = construct(PlayedStatCard, "Label", "Songs Played", 60, 70, 18)
+PlayedStatTitle.configure(fg="#E8FFF0", bg="#1A1A4A")
+
+### Statistic boxes are created on the lower half of the page###
+### Developed the "Profile" Page ###
+
+UpdateProfileTitle = construct(UpdateProfileFrame, "Label", "Edit Profile", 50, 20, 40)
+
+UpdateFirstNameLabel = construct(UpdateProfileFrame, "Label", "First Name", 50, 100, 20)
+UpdateFirstNameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 140, 20)
+
+UpdateLastNameLabel = construct(UpdateProfileFrame, "Label", "Last Name", 50, 200, 20)
+UpdateLastNameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 240, 20)
+
+UpdateEmailLabel = construct(UpdateProfileFrame, "Label", "Email Address", 50, 300, 20)
+UpdateEmailEntry = construct(UpdateProfileFrame, "Entry", "", 50, 340, 20)
+
+UpdateUsernameLabel = construct(UpdateProfileFrame, "Label", "Username", 50, 380, 20)
+UpdateUsernameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 420, 20)
+
+SaveProfileButton = construct(UpdateProfileFrame, "Button", "Save Changes", 50, 460, 20)
+SaveProfileButton.configure(width=14, command=lambda: ProfileManager().save_profile_changes())
+
+ChoosePhotoButton = construct(UpdateProfileFrame, "Button", "Choose Photo", 50, 520, 20)
+ChoosePhotoButton.configure(width=14, command=choose_profile_pic)
+
+UpdateErrorLabel = construct(UpdateProfileFrame, "Label", "", 50, 590, 18)
+UpdateErrorLabel.configure(fg="#FF5555")
+
+UpdateBackButton = construct(UpdateProfileFrame, "Button", "<< Back", 1050, 600, 20)
+UpdateBackButton.configure(width=10, command=lambda: change_frame(UpdateProfileFrame, ProfileFrame))
 
 Window.mainloop()
