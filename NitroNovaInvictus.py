@@ -4,8 +4,36 @@ import hashlib
 import tkinter.messagebox
 import tkinter.filedialog
 from PIL import Image, ImageTk
+import vlc
+import requests
 
 
+
+class Player:
+    def __init__(self):
+        self.Instance = vlc.Instance() ### Builds the VLC engine ###
+        self.MediaPlayer = self.Instance.media_player_new() ### Imported the player and assigned to a variable ###
+
+    def play_url(self, url):
+        Media = self.Instance.media_new(url) ### The link is given to the object that's created ###
+        self.MediaPlayer.set_media(Media) ### Gives the link to the player ###
+        self.MediaPlayer.play() ### Actually plays it ###
+
+    def pause(self):
+        self.MediaPlayer.set_pause(1) ### Pause the current track ###
+
+    def resume(self):
+        self.MediaPlayer.set_pause(0) ### Resume the paused track ###
+
+    def stop(self):
+        self.MediaPlayer.stop()  ### Stop playback completely ###
+
+    def is_playing(self):
+        return self.MediaPlayer.is_playing() == 1
+        ### Return True if audio is currently playing ###
+
+MusicPlayer = Player() ### Shared player for the whole app ###
+CurrentTrackUrl = None ### The current track url stored ###
 
 class Database:
     def __init__(self, path):
@@ -179,7 +207,7 @@ class ProfileManager:
         ### Load the profile picture and shrink it to a small portrait ###
         try:
             OpenedImage = Image.open(Details[4])
-            OpenedImage.thumbnail((100, 100))
+            OpenedImage.thumbnail((200, 400))
             ProfileImage = ImageTk.PhotoImage(OpenedImage)
             ProfileManager.ProfileImage = ProfileImage  ### keep a reference so it isn't deleted ###
             ProfilePicLabel.configure(image=ProfileImage)
@@ -466,43 +494,75 @@ def change_button_text(Button, NewText):
     Button.configure(text=NewText)
 
 def toggle_play():
-    if PlayButton.cget("text") == "▶":
-        change_button_text(PlayButton, "⏸")
-    elif PlayButton.cget("text") == "⏸":
-        change_button_text(PlayButton, "▶")
+    global CurrentTrackUrl
 
-    elif PlayButton.cget("text") == "▼":
-        change_button_text(PlayButton, "▲")
-    elif PlayButton.cget("text") == "▲":
-        change_button_text(PlayButton, "▼")
+    if MusicPlayer.is_playing():
+        MusicPlayer.pause()
+        change_button_text(PlayButton, "▶") ### Currently playing, so we want it to pause it ###
+
+    elif CurrentTrackUrl is not None:
+        MusicPlayer.resume()
+        change_button_text(PlayButton, "⏸") ### Paused, so we want to resume from where it stopped ###
+
+    else:
+        CurrentTrackUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        MusicPlayer.play_url(CurrentTrackUrl)
+        change_button_text(PlayButton, "⏸")
+        ### Nothing loaded yet, so load a track and play it ###
 
 ### Functions that allows me to change the purpose of the same button ###
 
-DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
-DB.create_table() ### One Database object shared by the whole app ###
+def toggle_expand():
+    if ExpandButton.cget("text") == "▲":
+        change_button_text(ExpandButton, "▼")
+    else:
+        change_button_text(ExpandButton, "▲")
 
-CurrentUsername = None
-CurrentUserQuestions = None ### Stores the security questions & answers fetched in step 1 ###
-CurrentUserEmail = None ### Stores the email so step 3 can update the right account ###
-PendingProfilePic = None
+### Function which changes the icon of my button that expands the music player ###
 
-Window = tk.Tk()
-Window.geometry("700x700")
-Window.title("NitroNova")
+def run_search():
+    SearchWord = SearchBar.get()  ### Get what the user typed into the search bar ###
+    url = "https://api.audius.co/v1/tracks/search?query=" + SearchWord + "&app_name=NitroNova"
+    Reply = requests.get(url) ### Ask Audius for the data ###
+    Data = Reply.json() ### Turn the reply into Python data ###
+    AllSongs = Data["data"]
+    expand_results_area()
+    show_results(AllSongs)
 
-LoginFrame = tk.Frame(Window, bg="#0A0A2A")
-LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
-ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
-ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
-ForgotPasswordFrame3 = tk.Frame(Window, bg="#0A0A2A")
-CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
-HomePageFrame = tk.Frame(Window, bg="#2C3863")
-ProfileFrame = tk.Frame(Window, bg="#0A0A2A")
-SettingsFrame = tk.Frame(Window, bg="#0A0A2A")
-OfflineFrame = tk.Frame(Window, bg="#0A0A2A")
-UpdateProfileFrame = tk.Frame(Window, bg="#0A0A2A", width=1100, height=250)
+### Function that gets the results the user searched from Audius API and stores it on the main program ###
 
-### Windows and the main frames for each screen are created ###
+def show_results(ListOfSongs):
+
+    for PreviousSearch in SuggestedFrame.winfo_children():
+        PreviousSearch.destroy() ### Delete any songs from a previous search ###
+
+    DownPosition = 60  ### Start near the top of the box ###
+    ResultsLabel = construct(SuggestedFrame, "Label", "Results:", 5, 0, 25)
+
+    for Song in ListOfSongs[:20]: ### Go through the first 15 songs ###
+        SongTitle = Song["title"]
+        ArtistName = Song["user"]["name"]
+        SongText = construct(SuggestedFrame, "Label", SongTitle + " by " + ArtistName, 10, DownPosition, 18, clickable=True)
+        make_song_clickable(SongText, Song)
+        DownPosition += 35
+
+### Function that displays the results found on Audius API ###
+
+def play_song(SongChosen):
+    global CurrentTrackUrl
+    SongID = SongChosen["id"]
+    StreamURL = "https://api.audius.co/v1/tracks/" + SongID + "/stream?app_name=NitroNova"
+    ### Build the stream address for that ID ###
+    CurrentTrackUrl = StreamURL
+    MusicPlayer.play_url(StreamURL) ### Play the song ###
+    change_button_text(PlayButton, "⏸")
+
+def make_song_clickable(SongLabel, SongChosen):
+    SongLabel.bind("<Button-1>", lambda event: play_song(SongChosen))
+    ### When this label is clicked, play the song ###
+
+### These 2 functions ensure that the song URL is built, and when the label is clicked, the song is played ###
+
 
 
 def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
@@ -533,16 +593,45 @@ def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget
 
 ### Function that allow me to create different widgets + clickable labels ###
 
-
-
 def change_frame(current, target):
     current.place_forget()
     target.place(x= 0, y= 0, relwidth= 1, relheight= 1)
 
-### Function that enables frames to be swaped, needs 2 parameters: One for the current frame, and the other for the frame you want to switch to ###
+### Function that enables frames to be swaped, needs 2 parameters: ###
+### One for the current frame, and the other for the frame you want to switch to ###
+
+def expand_results_area():
+    PlaylistsFrame.place_forget()
+    Divider2.place_forget() ### Hide the playlists section (want to use it after I press the search button) ###
+    SuggestedFrame.place(x=175, y=62, relwidth=1, height=574)
 
 
 
+DB = Database(r"C:\Users\valen\Desktop\NitroNova.db")
+DB.create_table() ### One Database object shared by the whole app ###
+
+CurrentUsername = None
+CurrentUserQuestions = None ### Stores the security questions & answers fetched in step 1 ###
+CurrentUserEmail = None ### Stores the email so step 3 can update the right account ###
+PendingProfilePic = None
+
+Window = tk.Tk()
+Window.geometry("700x700")
+Window.title("NitroNova")
+
+LoginFrame = tk.Frame(Window, bg="#0A0A2A")
+LoginFrame.place(x = 0, y = 0, relwidth = 1, relheight = 1)
+ForgotPasswordFrame1 = tk.Frame(Window, bg="#0A0A2A")
+ForgotPasswordFrame2 = tk.Frame(Window, bg="#0A0A2A")
+ForgotPasswordFrame3 = tk.Frame(Window, bg="#0A0A2A")
+CreateAccountFrame = tk.Frame(Window, bg="#0A0A2A")
+HomePageFrame = tk.Frame(Window, bg="#2C3863")
+ProfileFrame = tk.Frame(Window, bg="#0A0A2A")
+SettingsFrame = tk.Frame(Window, bg="#0A0A2A")
+OfflineFrame = tk.Frame(Window, bg="#0A0A2A")
+UpdateProfileFrame = tk.Frame(Window, bg="#0A0A2A", width=1100, height=250)
+
+### Windows and the main frames for each screen are created ###
 
 LogInLabel = construct(LoginFrame, "Label", "Log In", 275, 50, 50)
 UsernameLabel = construct(LoginFrame, "Label", "Username", 120, 175, 25)
@@ -571,8 +660,8 @@ LabelTable = [
     ("Security Question 1", 400, 230), ("Correct Answer 1", 400, 310),
     ("Security Question 2", 400, 390), ("Correct Answer 2", 400, 470)]
 
-     ### Create a table with all the features I want to implement on ###
-     ### the 'Create Account' page, so I can loop and place them on the Frame ###
+### Create a table with all the features I want to implement on the 'Create Account' page, ###
+### so I can loop and place them on the Frame ###
 
 EntryTable = {}
 
@@ -752,6 +841,7 @@ NowPlayingLabel.place(x=150, y=10)
 
 
 SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
+SearchButton.configure(command=run_search)
 SearchButton.place(x=520, y=12, width=40, height=36)
 
 PreviousButton = tk.Button(PlayerBar, text="⏮", font=("Segoe UI Emoji", 22), bg="#0A0A2A", fg="#E8FFF0", bd=0, cursor="hand2")
@@ -769,7 +859,7 @@ MoreButton.place(x=900, y=10, width=40, height=40)
 
 ExpandButton = tk.Button(PlayerBar, text="▲", font=("Segoe UI Emoji", 22), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
 ExpandButton.place(x=950, y=10, width=40, height=40)
-ExpandButton.configure(command=toggle_play)
+ExpandButton.configure(command=toggle_expand)
 
 SettingsBackButton = construct(SettingsFrame, "Button", "<< Back", 1050, 20, 20)
 SettingsBackButton.configure(width=10, command=lambda: change_frame(SettingsFrame, HomePageFrame))
@@ -789,19 +879,22 @@ ProfileCard = tk.Frame(ProfileFrame, bg="#1A1A4A", width=1100, height=250)
 ProfileCard.place(x=50, y=100)
 ProfileCard.pack_propagate(False)
 
-ProfilePicLabel = construct(ProfileCard, "Label", "", 40, 70, 20)
+ProfilePicLabel = construct(ProfileCard, "Label", "", 60, 25, 20)
 ProfilePicLabel.configure(bg="#1A1A4A")
 
-ProfileNameLabel = construct(ProfileCard, "Label", "Name", 500, 20, 20)
+ProfilePicDivider = tk.Frame(ProfileCard, bg="#0A0A2A", width=2, height=210)
+ProfilePicDivider.place(x=285, y=20)
+
+ProfileNameLabel = construct(ProfileCard, "Label", "Name", 310, 30, 20)
 ProfileNameLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
 
-ProfileUsernameLabel = construct(ProfileCard, "Label", "Username", 500, 70, 20)
+ProfileUsernameLabel = construct(ProfileCard, "Label", "Username", 310, 80, 20)
 ProfileUsernameLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
 
-ProfileEmailLabel = construct(ProfileCard, "Label", "Email Address", 500, 120, 20)
+ProfileEmailLabel = construct(ProfileCard, "Label", "Email Address", 310, 130, 20)
 ProfileEmailLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
 
-ProfileSinceLabel = construct(ProfileCard, "Label", "Member since:", 500, 170, 20)
+ProfileSinceLabel = construct(ProfileCard, "Label", "Member since:", 310, 180, 20)
 ProfileSinceLabel.configure(fg="#E8FFF0", bg="#1A1A4A")
 
 LogoutLabel = construct(ProfileFrame, "Label", "Log Out", 1000, 40, 20, clickable=True)
@@ -856,16 +949,16 @@ UpdateLastNameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 240, 20)
 UpdateEmailLabel = construct(UpdateProfileFrame, "Label", "Email Address", 50, 300, 20)
 UpdateEmailEntry = construct(UpdateProfileFrame, "Entry", "", 50, 340, 20)
 
-UpdateUsernameLabel = construct(UpdateProfileFrame, "Label", "Username", 50, 380, 20)
-UpdateUsernameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 420, 20)
+UpdateUsernameLabel = construct(UpdateProfileFrame, "Label", "Username", 50, 400, 20)
+UpdateUsernameEntry = construct(UpdateProfileFrame, "Entry", "", 50, 440, 20)
 
-SaveProfileButton = construct(UpdateProfileFrame, "Button", "Save Changes", 50, 460, 20)
+SaveProfileButton = construct(UpdateProfileFrame, "Button", "Save Changes", 50, 490, 20)
 SaveProfileButton.configure(width=14, command=lambda: ProfileManager().save_profile_changes())
 
-ChoosePhotoButton = construct(UpdateProfileFrame, "Button", "Choose Photo", 50, 520, 20)
+ChoosePhotoButton = construct(UpdateProfileFrame, "Button", "Choose Photo", 50, 560, 20)
 ChoosePhotoButton.configure(width=14, command=choose_profile_pic)
 
-UpdateErrorLabel = construct(UpdateProfileFrame, "Label", "", 50, 590, 18)
+UpdateErrorLabel = construct(UpdateProfileFrame, "Label", "", 50, 630, 18)
 UpdateErrorLabel.configure(fg="#FF5555")
 
 UpdateBackButton = construct(UpdateProfileFrame, "Button", "<< Back", 1050, 600, 20)
