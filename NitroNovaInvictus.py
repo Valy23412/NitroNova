@@ -6,6 +6,9 @@ import tkinter.filedialog
 from PIL import Image, ImageTk
 import vlc
 import requests
+from io import BytesIO
+from tkinter import ttk
+import random
 
 
 
@@ -13,6 +16,9 @@ class Player:
     def __init__(self):
         self.Instance = vlc.Instance() ### Builds the VLC engine ###
         self.MediaPlayer = self.Instance.media_player_new() ### Imported the player and assigned to a variable ###
+        self.Queue = []  ### Songs from the last search ###
+        self.Index = -1  ### Which song in the queue is playing ###
+        self.Loop = False  ### Repeat on/off ###
 
     def play_url(self, url):
         Media = self.Instance.media_new(url) ### The link is given to the object that's created ###
@@ -32,8 +38,37 @@ class Player:
         return self.MediaPlayer.is_playing() == 1
         ### Return True if audio is currently playing ###
 
+    def set_queue(self, Songs):
+        self.Queue = Songs
+        self.Index = -1
+
+    def next_song(self):
+        if self.Index + 1 < len(self.Queue):
+            self.Index += 1
+            return self.Queue[self.Index]
+        return None
+
+    def previous_song(self):
+        if self.Index > 0:
+            self.Index -= 1
+            return self.Queue[self.Index]
+        return None
+
+    def shuffle_song(self):
+        if self.Queue:
+            self.Index = random.randrange(len(self.Queue))
+            return self.Queue[self.Index]
+        return None
+
+    def toggle_loop(self):
+        self.Loop = not self.Loop
+        return self.Loop
+
 MusicPlayer = Player() ### Shared player for the whole app ###
 CurrentTrackUrl = None ### The current track url stored ###
+CurrentImageUrl = None ### Stores the picture url of the song playing ###
+CurrentSongTitle = "" ### Stores the name of the song playing ###
+CurrentSongArtist = "" ### Stores the artist of the song playing ###
 
 class Database:
     def __init__(self, path):
@@ -465,7 +500,7 @@ def login():
     CurrentUsername = Username
 
     ### Access granted that allows the user to reach Home ###
-    Window.geometry("1200x700")
+    Window.geometry("1400x700")
     change_frame(LoginFrame, HomePageFrame)
 
 ### Function that deals with the Log In authentication ###
@@ -512,12 +547,17 @@ def toggle_play():
 
 ### Functions that allows me to change the purpose of the same button ###
 
+
 def toggle_expand():
     if ExpandButton.cget("text") == "▲":
         change_button_text(ExpandButton, "▼")
+        SuggestedFrame.place(x=175, y=62, width=725, height=574)
+        MediaPlayerFrame.place(x=900, y=62, width=500, height=574)
+        MediaPlayerFrame.lift()
     else:
         change_button_text(ExpandButton, "▲")
-
+        MediaPlayerFrame.place_forget()
+        SuggestedFrame.place(x=175, y=62, width=1225, height=574)
 ### Function which changes the icon of my button that expands the music player ###
 
 def run_search():
@@ -526,6 +566,8 @@ def run_search():
     Reply = requests.get(url) ### Ask Audius for the data ###
     Data = Reply.json() ### Turn the reply into Python data ###
     AllSongs = Data["data"]
+    MusicPlayer.set_queue(AllSongs)  ### Give the player the new list ###
+
     expand_results_area()
     show_results(AllSongs)
 
@@ -549,13 +591,16 @@ def show_results(ListOfSongs):
 ### Function that displays the results found on Audius API ###
 
 def play_song(SongChosen):
-    global CurrentTrackUrl
-    SongID = SongChosen["id"]
-    StreamURL = "https://api.audius.co/v1/tracks/" + SongID + "/stream?app_name=NitroNova"
-    ### Build the stream address for that ID ###
-    CurrentTrackUrl = StreamURL
-    MusicPlayer.play_url(StreamURL) ### Play the song ###
+    global CurrentTrackUrl, CurrentImageUrl, CurrentSongTitle, CurrentSongArtist
+
+    CurrentTrackUrl = "https://api.audius.co/v1/tracks/" + SongChosen["id"] + "/stream?app_name=NitroNova"
+    CurrentImageUrl = SongChosen["artwork"]["480x480"]
+    CurrentSongTitle = SongChosen["title"]
+    CurrentSongArtist = SongChosen["user"]["name"]
+
+    MusicPlayer.play_url(CurrentTrackUrl)
     change_button_text(PlayButton, "⏸")
+    show_now_playing()
 
 def make_song_clickable(SongLabel, SongChosen):
     SongLabel.bind("<Button-1>", lambda event: play_song(SongChosen))
@@ -563,7 +608,25 @@ def make_song_clickable(SongLabel, SongChosen):
 
 ### These 2 functions ensure that the song URL is built, and when the label is clicked, the song is played ###
 
+def show_now_playing():
+    if CurrentImageUrl is None: ### Nothing played yet ###
+        return
 
+    Picture = requests.get(CurrentImageUrl)
+    Art = ImageTk.PhotoImage(Image.open(BytesIO(Picture.content)).resize((400, 400)))
+    ImageLabel.configure(image=Art)
+    ImageLabel.image = Art ### Keep a reference or the picture vanishes ###
+
+    PlayerTitleLabel.configure(text=CurrentSongTitle)
+    PlayerArtistLabel.configure(text=CurrentSongArtist)
+    NowPlayingLabel.configure(text=CurrentSongTitle)
+
+def update_progress():
+    Length = MusicPlayer.MediaPlayer.get_length()
+    if Length > 0:
+        ProgressBar["maximum"] = Length
+        ProgressBar["value"] = MusicPlayer.MediaPlayer.get_time()
+    Window.after(500, update_progress)
 
 def construct(typeOfFrame, typeOfWidget, textOfLabel, Xaxis, Yaxis, sizeOfWidget, clickable=False):
     if typeOfWidget == "Label":
@@ -604,6 +667,31 @@ def expand_results_area():
     PlaylistsFrame.place_forget()
     Divider2.place_forget() ### Hide the playlists section (want to use it after I press the search button) ###
     SuggestedFrame.place(x=175, y=62, relwidth=1, height=574)
+
+    if ExpandButton.cget("text") == "▼":  ### Only close it if the panel is open ###
+        toggle_expand()
+
+### The widgets inside the expandable music player ###
+def next_song_button():
+    Song = MusicPlayer.next_song()
+    if Song is not None:
+        play_song(Song)
+
+def previous_song_button():
+    Song = MusicPlayer.previous_song()
+    if Song is not None:
+        play_song(Song)
+
+def shuffle_song_button():
+    Song = MusicPlayer.shuffle_song()
+    if Song is not None:
+        play_song(Song)
+
+def toggle_repeat_button():
+    if MusicPlayer.toggle_loop() == True:
+        ControlButtons["Repeat"].configure(fg="#40E0D0")
+    else:
+        ControlButtons["Repeat"].configure(fg="#E8FFF0")
 
 
 
@@ -774,6 +862,7 @@ PlayerBar = tk.Frame(HomePageFrame, bg="#0A0A2A", height=60)
 PlayerBar.place(x=175, y=640, relwidth=1)
 PlayerBar.pack_propagate(False)
 
+MediaPlayerFrame = tk.Frame(HomePageFrame, bg="#1A1A4A")
 
 
 Divider1 = tk.Frame(HomePageFrame, bg="#1A1A4A", height=4)
@@ -834,10 +923,14 @@ YourPlaylistsLabel = tk.Label(PlaylistsFrame, text="Your Playlists", font=("Agen
 YourPlaylistsLabel.place(x=10, y=5)
 
 NowPlayingLabel = tk.Label(PlayerBar, text="Nothing is played", font=("Agency FB", 25, "bold"), bg="#0A0A2A", fg="#E8FFF0")
-NowPlayingLabel.place(x=150, y=10)
+NowPlayingLabel.place(x=150, y=2)
 
 ### Created all the labels on the Home Page ###
 
+ProgressBar = ttk.Progressbar(PlayerBar, orient="horizontal", mode="determinate")
+ProgressBar.place(x=150, y=44, width=500, height=6)
+
+### Thin bar under the title that fills up as the song plays ###
 
 
 SearchButton = tk.Button(HomePageFrame, text="🔎", font=("Segoe UI Emoji", 16), bg="#2c3863", fg="#E8FFF0", bd=0, cursor="hand2")
@@ -964,4 +1057,33 @@ UpdateErrorLabel.configure(fg="#FF5555")
 UpdateBackButton = construct(UpdateProfileFrame, "Button", "<< Back", 1050, 600, 20)
 UpdateBackButton.configure(width=10, command=lambda: change_frame(UpdateProfileFrame, ProfileFrame))
 
+### Update profile page terminated, so now everything works together ###
+
+### My construct function cannot hold a picture or a size, so this one is created directly ###
+ImageLabel = tk.Label(MediaPlayerFrame, bg="#1A1A4A")
+ImageLabel.place(x=50, y=20, width=400, height=400)
+
+### Song title and artist, repainted to match the panel background ###
+PlayerTitleLabel = construct(MediaPlayerFrame, "Label", "", 20, 435, 22)
+PlayerTitleLabel.configure(bg="#1A1A4A", wraplength=460)
+
+PlayerArtistLabel = construct(MediaPlayerFrame, "Label", "", 20, 475, 16)
+PlayerArtistLabel.configure(bg="#1A1A4A", fg="#40E0D0")
+
+### Control buttons laid out from a table, so adding a new one is just one extra row ###
+ControlTable = [("Shuffle", "🔀", 50, shuffle_song_button),
+                ("Previous", "⏮", 140, previous_song_button),
+                ("Play", "▶", 230, toggle_play),
+                ("Next", "⏭", 320, next_song_button),
+                ("Repeat", "🔁", 410, toggle_repeat_button)]
+
+ControlButtons = {}
+
+for Name, Symbol, Xaxis, Action in ControlTable:
+    Button = construct(MediaPlayerFrame, "Button", Symbol, Xaxis, 515, 18)
+    Button.configure(bg="#1A1A4A", fg="#E8FFF0", bd=0, font=("Segoe UI Emoji", 18), command=Action)
+
+### This loop creates the buttons more efficiently, instead of me writng them all ###
+
+update_progress() ### Runs the bar as soon as the program runs ###
 Window.mainloop()
